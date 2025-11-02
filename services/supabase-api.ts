@@ -216,6 +216,47 @@ class SupabaseApiService {
     });
   }
 
+  async updateClient(id: string, clientData: Partial<Omit<Client, 'id'>>): Promise<Client> {
+    return SupabaseService.withErrorHandling(async () => {
+      const updateData: any = {};
+      
+      if (clientData.name !== undefined) updateData.name = clientData.name;
+      if (clientData.businessName !== undefined) updateData.business_name = clientData.businessName;
+      if (clientData.email !== undefined) updateData.email = clientData.email;
+      if (clientData.phone !== undefined) updateData.phone = clientData.phone;
+      if (clientData.address !== undefined) updateData.address = clientData.address;
+      if (clientData.creditLimit !== undefined) updateData.credit_limit = clientData.creditLimit;
+      if (clientData.paymentTermDays !== undefined) updateData.payment_term_days = clientData.paymentTermDays;
+      if (clientData.currentBalance !== undefined) updateData.current_balance = clientData.currentBalance;
+      if (clientData.riskLevel !== undefined) updateData.risk_level = clientData.riskLevel;
+      if (clientData.totalOrderValue !== undefined) updateData.total_order_value = clientData.totalOrderValue;
+      if (clientData.reliabilityScore !== undefined) updateData.reliability_score = clientData.reliabilityScore;
+      
+      updateData.updated_at = new Date().toISOString();
+
+      const response = await supabase
+        .from(TABLES.CLIENTS)
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      const data = await SupabaseService.handleResponse(response);
+      return this.transformClient(data);
+    });
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    return SupabaseService.withErrorHandling(async () => {
+      const response = await supabase
+        .from(TABLES.CLIENTS)
+        .update({ is_active: false })
+        .eq('id', id);
+      
+      await SupabaseService.handleResponse(response);
+    });
+  }
+
   // Materials API
   async getMaterials(): Promise<Material[]> {
     return SupabaseService.withErrorHandling(async () => {
@@ -247,6 +288,43 @@ class SupabaseApiService {
       
       const data = await SupabaseService.handleResponse(response);
       return this.transformMaterial(data);
+    });
+  }
+
+  async updateMaterial(id: string, materialData: Partial<Omit<Material, 'id'>>): Promise<Material> {
+    return SupabaseService.withErrorHandling(async () => {
+      const updateData: any = {};
+      
+      if (materialData.name !== undefined) updateData.name = materialData.name;
+      if (materialData.unit !== undefined) updateData.unit = materialData.unit;
+      if (materialData.stock !== undefined) updateData.stock = materialData.stock;
+      if (materialData.costPerUnit !== undefined) updateData.cost_per_unit = materialData.costPerUnit;
+      if (materialData.supplier !== undefined) updateData.supplier = materialData.supplier;
+      if (materialData.expirationDate !== undefined) updateData.expiration_date = materialData.expirationDate;
+      if (materialData.minStockLevel !== undefined) updateData.min_stock_level = materialData.minStockLevel;
+      
+      updateData.updated_at = new Date().toISOString();
+
+      const response = await supabase
+        .from(TABLES.MATERIALS)
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      const data = await SupabaseService.handleResponse(response);
+      return this.transformMaterial(data);
+    });
+  }
+
+  async deleteMaterial(id: string): Promise<void> {
+    return SupabaseService.withErrorHandling(async () => {
+      const response = await supabase
+        .from(TABLES.MATERIALS)
+        .delete()
+        .eq('id', id);
+      
+      await SupabaseService.handleResponse(response);
     });
   }
 

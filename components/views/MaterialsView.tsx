@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { supabaseApi } from '../../services/supabase-api';
 import { Material, MaterialUnit } from '../../types';
 import { generateId } from '../../utils';
 import { MATERIAL_UNITS } from '../../constants';
@@ -14,10 +14,28 @@ interface MaterialsViewProps {
 }
 
 export const MaterialsView: React.FC<MaterialsViewProps> = ({ t, showToast }) => {
-  const [materials, setMaterials] = useState<Material[]>(api.getMaterials());
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadMaterials();
+  }, []);
+
+  const loadMaterials = async () => {
+    try {
+      setLoading(true);
+      const materialsData = await supabaseApi.getMaterials();
+      setMaterials(materialsData);
+    } catch (error) {
+      console.error('Error loading materials:', error);
+      showToast('Error loading materials', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (material: Material | null = null) => {
     setEditingMaterial(material);
@@ -29,26 +47,33 @@ export const MaterialsView: React.FC<MaterialsViewProps> = ({ t, showToast }) =>
     setIsModalOpen(false);
   };
 
-  const handleSave = (materialData: Omit<Material, 'id'>) => {
-    let updatedMaterials;
-    if (editingMaterial) {
-      updatedMaterials = materials.map(p => p.id === editingMaterial.id ? { ...p, ...materialData } : p);
-    } else {
-      updatedMaterials = [...materials, { ...materialData, id: generateId() }];
+  const handleSave = async (materialData: Omit<Material, 'id'>) => {
+    try {
+      if (editingMaterial) {
+        await supabaseApi.updateMaterial(editingMaterial.id, materialData);
+      } else {
+        await supabaseApi.createMaterial(materialData);
+      }
+      await loadMaterials(); // Reload the data
+      handleCloseModal();
+      showToast(t.materials.saved);
+    } catch (error) {
+      console.error('Error saving material:', error);
+      showToast('Error saving material', 'error');
     }
-    setMaterials(updatedMaterials);
-    api.saveMaterials(updatedMaterials);
-    handleCloseModal();
-    showToast(t.materials.saved);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     // TODO: Check if material is used in recipes before deleting
     if (window.confirm(t.materials.deleteConfirm)) {
-      const updatedMaterials = materials.filter(p => p.id !== id);
-      setMaterials(updatedMaterials);
-      api.saveMaterials(updatedMaterials);
-      showToast(t.materials.deleted);
+      try {
+        await supabaseApi.deleteMaterial(id);
+        await loadMaterials(); // Reload the data
+        showToast(t.materials.deleted);
+      } catch (error) {
+        console.error('Error deleting material:', error);
+        showToast('Error deleting material', 'error');
+      }
     }
   };
 
