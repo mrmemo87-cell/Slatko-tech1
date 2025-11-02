@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Client, Product, DeliveryItem } from '../../types';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { generateId, todayISO, formatCurrency } from '../../utils';
 
 interface QuickDeliveryProps {
@@ -13,11 +13,33 @@ interface QuickDeliveryProps {
 const QUICK_QUANTITIES = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24];
 
 export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onClose }) => {
-  const [clients] = useState<Client[]>(api.getClients());
-  const [products] = useState<Product[]>(api.getProducts());
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [cart, setCart] = useState<DeliveryItem[]>([]);
   const [step, setStep] = useState<'client' | 'products' | 'review'>('client');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [clientsData, productsData] = await Promise.all([
+        supabaseApi.getClients(),
+        supabaseApi.getProducts()
+      ]);
+      setClients(clientsData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Quick client selection with large touch targets
   const ClientSelector = () => (
@@ -44,7 +66,7 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
 
   // Product selection with quantity buttons
   const ProductSelector = () => {
-    const inventory = api.getInventory();
+    // TODO: Implement inventory check with Supabase API if needed
     
     const addToCart = (product: Product, quantity: number) => {
       const price = selectedClient?.customPrices.find(cp => cp.productId === product.id)?.price || product.defaultPrice;
@@ -99,7 +121,7 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
 
         <div className="space-y-3">
           {products.map(product => {
-            const available = inventory[product.id] || 0;
+            // TODO: Add inventory check with Supabase API if needed
             const price = selectedClient?.customPrices.find(cp => cp.productId === product.id)?.price || product.defaultPrice;
             const inCart = cart.find(item => item.productId === product.id)?.quantity || 0;
             
@@ -110,28 +132,23 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
                     <h4 className="font-medium text-gray-900">{product.name}</h4>
                     <p className="text-sm text-gray-500">{formatCurrency(price)}/{product.unit}</p>
                     <p className="text-xs text-gray-400">
-                      Available: {available} | In cart: {inCart}
+                      In cart: {inCart}
                     </p>
                   </div>
                 </div>
                 
                 {/* Quick quantity buttons */}
                 <div className="grid grid-cols-4 gap-2">
-                  {QUICK_QUANTITIES.filter(q => q <= available - inCart && q > 0).slice(0, 8).map(quantity => (
+                  {QUICK_QUANTITIES.slice(0, 8).map(quantity => (
                     <button
                       key={quantity}
                       onClick={() => addToCart(product, quantity)}
                       className="bg-blue-600 text-white py-2 px-2 rounded text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
-                      disabled={available - inCart < quantity}
                     >
                       +{quantity}
                     </button>
                   ))}
                 </div>
-                
-                {available - inCart === 0 && (
-                  <p className="text-red-500 text-xs mt-2">Out of stock</p>
-                )}
               </div>
             );
           })}
@@ -144,23 +161,24 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
   const ReviewOrder = () => {
     const total = cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!selectedClient || cart.length === 0) return;
       
-      const delivery = {
-        invoiceNumber: `SL-${Date.now().toString().slice(-6)}`,
-        date: new Date().toISOString(),
-        clientId: selectedClient.id,
-        items: cart,
-        status: 'Pending' as const,
-        notes: `Quick order - ${new Date().toLocaleTimeString()}`
-      };
-      
-      const deliveries = api.getDeliveries();
-      api.saveDeliveries([{ ...delivery, id: generateId() }, ...deliveries]);
-      
-      showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`);
-      onClose();
+      try {
+        // Create delivery using Supabase API
+        await supabaseApi.createDelivery({
+          date: new Date().toISOString(),
+          clientId: selectedClient.id,
+          items: cart,
+          notes: `Quick order - ${new Date().toLocaleTimeString()}`
+        });
+        
+        showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`);
+        onClose();
+      } catch (error) {
+        console.error('Error creating delivery:', error);
+        showToast('Error creating order', 'error');
+      }
     };
 
     const removeFromCart = (productId: string) => {
@@ -271,9 +289,18 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
           </button>
         </div>
 
-        {step === 'client' && <ClientSelector />}
-        {step === 'products' && <ProductSelector />}
-        {step === 'review' && <ReviewOrder />}
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="ml-2 text-slate-500">Loading clients and products...</p>
+          </div>
+        ) : (
+          <>
+            {step === 'client' && <ClientSelector />}
+            {step === 'products' && <ProductSelector />}
+            {step === 'review' && <ReviewOrder />}
+          </>
+        )}
       </div>
     </div>
   );

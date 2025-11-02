@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Product, Material, ProductionBatch } from '../../types';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { generateId, todayISO } from '../../utils';
 
 interface QuickProductionProps {
@@ -13,11 +13,33 @@ interface QuickProductionProps {
 const QUICK_BATCH_SIZES = [1, 2, 4, 6, 8, 10, 12, 16, 20, 24];
 
 export const QuickProduction: React.FC<QuickProductionProps> = ({ t, showToast, onClose }) => {
-  const [products] = useState<Product[]>(api.getProducts());
-  const [materials] = useState<Material[]>(api.getMaterials());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
   const [materialCheck, setMaterialCheck] = useState<{available: boolean, details: any[]}>({available: false, details: []});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [productsData, materialsData] = await Promise.all([
+        supabaseApi.getProducts(),
+        supabaseApi.getMaterials()
+      ]);
+      setProducts(productsData);
+      setMaterials(materialsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedProduct && selectedQuantity > 0) {
@@ -49,20 +71,23 @@ export const QuickProduction: React.FC<QuickProductionProps> = ({ t, showToast, 
     setMaterialCheck({available: allAvailable, details});
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedProduct || selectedQuantity === 0 || !materialCheck.available) return;
 
-    const batch: Omit<ProductionBatch, 'id'> = {
-      date: new Date().toISOString(),
-      productId: selectedProduct.id,
-      quantity: selectedQuantity,
-      notes: `Quick batch - ${new Date().toLocaleTimeString()}`,
-      batchStatus: 'COMPLETED'
-    };
-
-    api.addProductionBatch(batch);
-    showToast(`Production batch created: ${selectedQuantity}x ${selectedProduct.name}`);
-    onClose();
+    try {
+      await supabaseApi.createProductionBatch({
+        productId: selectedProduct.id,
+        quantity: selectedQuantity,
+        startDate: new Date().toISOString(),
+        notes: `Quick batch - ${new Date().toLocaleTimeString()}`
+      });
+      
+      showToast(`Production batch created: ${selectedQuantity}x ${selectedProduct.name}`);
+      onClose();
+    } catch (error) {
+      console.error('Error creating production batch:', error);
+      showToast('Error creating production batch', 'error');
+    }
   };
 
   const ProductGrid = () => (

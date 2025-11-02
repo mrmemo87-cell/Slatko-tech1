@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Delivery, Client, Product, ReturnItem, Payment } from '../../types';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { formatCurrency, formatDate, generateId, todayISO } from '../../utils';
 
 interface QuickSettlementProps {
@@ -14,10 +14,32 @@ interface QuickSettlementProps {
 export const QuickSettlement: React.FC<QuickSettlementProps> = ({ 
   delivery, t, showToast, onClose, onUpdate 
 }) => {
-  const [clients] = useState<Client[]>(api.getClients());
-  const [products] = useState<Product[]>(api.getProducts());
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [returns, setReturns] = useState<ReturnItem[]>(delivery.returnedItems || []);
   const [newPayment, setNewPayment] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [clientsData, productsData] = await Promise.all([
+        supabaseApi.getClients(),
+        supabaseApi.getProducts()
+      ]);
+      setClients(clientsData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
   const [step, setStep] = useState<'overview' | 'returns' | 'payment'>('overview');
 
   const client = clients.find(c => c.id === delivery.clientId);
