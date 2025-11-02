@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabaseApi } from '../../services/supabase-api';
 import { InventoryDetail } from '../../types';
 
 interface InventoryViewProps {
@@ -9,8 +9,52 @@ interface InventoryViewProps {
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({ t }) => {
-  const [inventoryDetails, setInventoryDetails] = useState<InventoryDetail[]>(api.getInventoryDetail());
+  const [inventoryDetails, setInventoryDetails] = useState<InventoryDetail[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      // Get inventory from production batches and deliveries
+      const [products, production, deliveries] = await Promise.all([
+        supabaseApi.getProducts(),
+        supabaseApi.getProductionBatches(),
+        supabaseApi.getDeliveries()
+      ]);
+
+      // Calculate inventory similar to how api.ts does it
+      const inventory = products.map(product => {
+        const produced = production
+          .filter(batch => batch.productId === product.id)
+          .reduce((sum, batch) => sum + batch.quantity, 0);
+
+        const delivered = deliveries
+          .flatMap(delivery => delivery.items)
+          .filter(item => item.productId === product.id)
+          .reduce((sum, item) => sum + item.quantity, 0);
+
+        return {
+          productId: product.id,
+          productName: product.name,
+          produced,
+          delivered,
+          remaining: produced - delivered,
+          unit: product.unit
+        };
+      });
+
+      setInventoryDetails(inventory);
+    } catch (error) {
+      console.error('Error loading inventory:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredDetails = useMemo(() => {
     return inventoryDetails.filter(detail =>

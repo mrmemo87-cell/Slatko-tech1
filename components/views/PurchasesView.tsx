@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabaseApi } from '../../services/supabase-api';
 import { Purchase, Material, PurchaseItem } from '../../types';
 import { formatDate, formatCurrency, todayISO } from '../../utils';
 import { Modal } from '../ui/Modal';
@@ -17,9 +17,31 @@ const calculatePurchaseTotal = (items: PurchaseItem[], materials: Material[]): n
 };
 
 export const PurchasesView: React.FC<PurchasesViewProps> = ({ t, showToast }) => {
-  const [purchases, setPurchases] = useState<Purchase[]>(api.getPurchases().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  const [materials] = useState<Material[]>(api.getMaterials());
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [purchasesData, materialsData] = await Promise.all([
+        supabaseApi.getPurchases(),
+        supabaseApi.getMaterials()
+      ]);
+      setPurchases(purchasesData.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setMaterials(materialsData);
+    } catch (error) {
+      console.error('Error loading purchases data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = () => {
     setIsModalOpen(true);
@@ -29,20 +51,39 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ t, showToast }) =>
     setIsModalOpen(false);
   };
 
-  const handleSave = (purchaseData: Omit<Purchase, 'id'>) => {
-    api.addPurchase(purchaseData);
-    setPurchases(api.getPurchases().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    handleCloseModal();
-    showToast(t.purchases.saved);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm(t.purchases.deleteConfirm)) {
-      api.deletePurchase(id);
-      setPurchases(api.getPurchases().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      showToast(t.purchases.deleted);
+  const handleSavePurchase = async (purchaseData: Omit<Purchase, 'id' | 'total'>) => {
+    try {
+      await supabaseApi.addPurchase(purchaseData);
+      await loadData(); // Reload data
+      setIsModalOpen(false);
+      showToast(t.purchases.addSuccess);
+    } catch (error) {
+      console.error('Error adding purchase:', error);
+      showToast('Error adding purchase', 'error');
     }
   };
+
+  const handleDeletePurchase = async (id: string) => {
+    if (confirm(t.purchases.deleteConfirm)) {
+      try {
+        await supabaseApi.deletePurchase(id);
+        await loadData(); // Reload data
+        showToast(t.purchases.deleteSuccess);
+      } catch (error) {
+        console.error('Error deleting purchase:', error);
+        showToast('Error deleting purchase', 'error');
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading purchases...</span>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -76,7 +117,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ t, showToast }) =>
                 <td className="px-6 py-4">{purchase.items.length}</td>
                 <td className="px-6 py-4 text-right font-semibold">{formatCurrency(calculatePurchaseTotal(purchase.items, materials))}</td>
                 <td className="px-6 py-4 text-right">
-                  <button onClick={() => handleDelete(purchase.id)} className="text-red-600 hover:text-red-800"><DeleteIcon /></button>
+                  <button onClick={() => handleDeletePurchase(purchase.id)} className="text-red-600 hover:text-red-800"><DeleteIcon /></button>
                 </td>
               </tr>
             ))}
@@ -92,7 +133,7 @@ export const PurchasesView: React.FC<PurchasesViewProps> = ({ t, showToast }) =>
       <PurchaseFormModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSave={handleSave}
+        onSave={handleSavePurchase}
         materials={materials}
         t={t}
       />

@@ -1,7 +1,7 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { formatCurrency } from '../../utils';
 import { Product, Client, Delivery } from '../../types';
 
@@ -18,10 +18,44 @@ const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title,
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
-  const products = api.getProducts();
-  const clients = api.getClients();
-  const production = api.getProduction();
-  const deliveries = api.getDeliveries();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [production, setProduction] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [productsData, clientsData, productionData, deliveriesData] = await Promise.all([
+        supabaseApi.getProducts(),
+        supabaseApi.getClients(),
+        supabaseApi.getProductionBatches(),
+        supabaseApi.getDeliveries()
+      ]);
+      setProducts(productsData);
+      setClients(clientsData);
+      setProduction(productionData);
+      setDeliveries(deliveriesData);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading dashboard...</span>
+      </div>
+    );
+  }
 
   const metrics = useMemo(() => {
     // Current Inventory

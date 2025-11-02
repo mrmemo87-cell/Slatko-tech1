@@ -703,10 +703,28 @@ class SupabaseApiService {
       )
       .subscribe();
   }
+
+  // Purchases Methods
+  async getPurchases(): Promise<any[]> {
+    // For now, return empty array since purchases table doesn't exist in schema
+    // This would need to be implemented when purchases are added to database
+    return [];
+  }
+
+  async addPurchase(purchase: any): Promise<any> {
+    // Placeholder - would need purchases table in schema
+    console.warn('Purchases not implemented in Supabase schema yet');
+    return purchase;
+  }
+
+  async deletePurchase(id: string): Promise<void> {
+    // Placeholder - would need purchases table in schema
+    console.warn('Purchases not implemented in Supabase schema yet');
+  }
 }
 
 // Create singleton instance
 export const supabaseApi = new SupabaseApiService();
 
 // Export for global access
-window.supabaseApi = supabaseApi;
+(window as any).supabaseApi = supabaseApi;
