@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { SlatkoIcon } from '../ui/Icons';
+import { testConnection } from '../../config/supabase';
 
 interface LoginFormProps {
   t: any;
@@ -36,6 +37,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({ t }) => {
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    console.log('Testing Supabase connection...');
+    const result = await testConnection();
+    console.log('Connection result:', result);
+    if (result.success) {
+      setError('✅ Connection successful! Supabase is working.');
+    } else {
+      setError(`❌ Connection failed: ${result.error?.message || 'Unknown error'}`);
     }
   };
 
@@ -150,6 +162,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ t }) => {
                 ? 'Already have an account? Sign in'
                 : 'Need an account? Sign up'
               }
+            </button>
+          </div>
+
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 underline"
+            >
+              Test Connection
             </button>
           </div>
         </form>

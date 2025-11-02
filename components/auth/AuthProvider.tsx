@@ -36,23 +36,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in user:', email);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
+      console.log('Sign in response:', { error });
+      
       if (error) {
+        console.error('Supabase auth error:', error);
         return { error: error.message };
       }
       
       return {};
     } catch (error) {
-      return { error: 'An unexpected error occurred' };
+      console.error('Unexpected error during sign in:', error);
+      return { error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
   };
 
   const signUp = async (email: string, password: string, username: string) => {
     try {
+      console.log('Attempting to sign up user:', email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -63,12 +71,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
+      console.log('Sign up response:', { data, error });
+
       if (error) {
+        console.error('Supabase auth error:', error);
         return { error: error.message };
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        return { error: 'Please check your email for confirmation link' };
       }
 
       // Create user profile in public.users table
       if (data.user) {
+        console.log('Creating user profile for:', data.user.id);
         const { error: profileError } = await supabase
           .from('users')
           .insert({
@@ -79,12 +96,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
+          // Don't fail the sign up if profile creation fails
         }
       }
 
       return {};
     } catch (error) {
-      return { error: 'An unexpected error occurred' };
+      console.error('Unexpected error during sign up:', error);
+      return { error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
   };
 

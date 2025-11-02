@@ -7,6 +7,19 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Test connection function
+export const testConnection = async () => {
+  try {
+    console.log('Testing Supabase connection...');
+    const { data, error } = await supabase.from('clients').select('count').limit(1);
+    console.log('Connection test result:', { data, error });
+    return { success: !error, error };
+  } catch (error) {
+    console.error('Connection test failed:', error);
+    return { success: false, error };
+  }
+};
+
 // Database table names
 export const TABLES = {
   USERS: 'users',
