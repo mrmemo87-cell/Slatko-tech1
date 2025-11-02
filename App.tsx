@@ -29,6 +29,7 @@ const AppContent: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'ru'>('en');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const t = useMemo(() => translations[lang], [lang]);
 
@@ -107,7 +108,10 @@ const AppContent: React.FC = () => {
 
   const NavItem = ({ icon, label, id }: { icon: React.ReactElement, label: string, id: View }) => (
     <button
-      onClick={() => setView(id)}
+      onClick={() => {
+        setView(id);
+        setIsSidebarOpen(false); // Close sidebar on mobile after selecting
+      }}
       className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
         view === id
           ? 'bg-blue-600 text-white'
@@ -123,7 +127,18 @@ const AppContent: React.FC = () => {
     <>
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
       <div className={`flex h-screen bg-slate-100 dark:bg-slate-900 ${isDarkMode ? 'dark' : ''}`}>
-        <aside className="no-print flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 transition-colors duration-200">
+        {/* Mobile Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        
+        {/* Sidebar */}
+        <aside className={`no-print flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 transition-all duration-300 z-50 ${
+          isSidebarOpen ? 'fixed inset-y-0 left-0 w-64 lg:relative lg:translate-x-0' : 'hidden lg:flex lg:w-64'
+        }`}>
           <div className="flex items-center mb-8 px-2">
             <SlatkoIcon className="h-8 w-8 text-blue-600" />
             <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>
@@ -162,9 +177,25 @@ const AppContent: React.FC = () => {
           </div>
         </aside>
         <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-          {/* Header with Alert Center */}
+          {/* Header with Menu Button and Alert Center */}
           <div className="no-print bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 md:px-8 py-4">
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              {/* Logo on Mobile */}
+              <div className="flex items-center lg:hidden">
+                <SlatkoIcon className="h-6 w-6 text-blue-600" />
+                <span className="ml-2 text-lg font-bold text-slate-800 dark:text-white">Slatko</span>
+              </div>
+              
               <AlertCenter t={t} />
             </div>
           </div>
