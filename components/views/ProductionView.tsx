@@ -52,11 +52,16 @@ export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) 
     setIsModalOpen(false);
   };
 
-  const handleSave = (batchData: Omit<ProductionBatch, 'id'>) => {
-    api.addProductionBatch(batchData);
-    setBatches(api.getProduction());
-    handleCloseModal();
-    showToast(t.production.saved);
+  const handleSave = async (batchData: Omit<ProductionBatch, 'id'>) => {
+    try {
+      await supabaseApi.createProductionBatch(batchData);
+      await loadData();
+      handleCloseModal();
+      showToast(t.production.saved);
+    } catch (error) {
+      console.error('Error saving production batch:', error);
+      showToast('Error saving production batch', 'error');
+    }
   };
 
   const handleDeleteRequest = (id: string) => {
@@ -64,10 +69,17 @@ export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) 
     setIsConfirmOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (batchToDelete) {
-      api.deleteProductionBatch(batchToDelete);
-      setBatches(api.getProduction());
+      try {
+        // TODO: Implement deleteProductionBatch in supabaseApi
+        console.warn('Delete production batch not implemented yet');
+        await loadData();
+        showToast(t.production.deleted);
+      } catch (error) {
+        console.error('Error deleting production batch:', error);
+        showToast('Error deleting production batch', 'error');
+      }
       showToast(t.production.deleted);
       setIsConfirmOpen(false);
       setBatchToDelete(null);

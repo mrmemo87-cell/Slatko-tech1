@@ -19,13 +19,37 @@ const getDeliveryTotal = (delivery: Delivery): number => {
 };
 
 export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) => {
-  const [deliveries, setDeliveries] = useState<Delivery[]>(api.getDeliveries().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-  const [clients] = useState<Client[]>(api.getClients());
-  const [products] = useState<Product[]>(api.getProducts());
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDelivery, setEditingDelivery] = useState<Delivery | null>(null);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [settlingDelivery, setSettlingDelivery] = useState<Delivery | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [deliveriesData, clientsData, productsData] = await Promise.all([
+        supabaseApi.getDeliveries(),
+        supabaseApi.getClients(),
+        supabaseApi.getProducts()
+      ]);
+      setDeliveries(deliveriesData.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setClients(clientsData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading deliveries data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [filter, setFilter] = useState<{ status: DeliveryStatus | 'All', client: string }>({ status: 'All', client: 'All' });
 
@@ -39,29 +63,50 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
     setIsSettleModalOpen(true);
   };
 
-  const handleSave = (deliveryData: Omit<Delivery, 'id'>) => {
-    let updatedDeliveries;
-    if (editingDelivery) {
-        // Not implemented for this app scope, only new deliveries
-    } else {
-      const nextInvoiceNumber = `SL-${(deliveries.length + 1).toString().padStart(3, '0')}`;
-      updatedDeliveries = [{...deliveryData, id: generateId(), invoiceNumber: nextInvoiceNumber}, ...deliveries];
+  const handleSave = async (deliveryData: Omit<Delivery, 'id' | 'invoiceNumber'>) => {
+    try {
+      if (editingDelivery) {
+        // Update existing delivery - TODO: Implement updateDelivery in supabaseApi
+        console.warn('Update delivery not implemented yet');
+        showToast('Update not implemented yet', 'error');
+      } else {
+        // Create new delivery
+        const nextInvoiceNumber = `SL-${(deliveries.length + 1).toString().padStart(3, '0')}`;
+        await supabaseApi.createDelivery({
+          ...deliveryData,
+          invoiceNumber: nextInvoiceNumber
+        });
+        await loadData(); // Reload all data
+        showToast(t.deliveries.saved);
+      }
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving delivery:', error);
+      showToast('Error saving delivery', 'error');
     }
-    setDeliveries(updatedDeliveries);
-    api.saveDeliveries(updatedDeliveries);
-    setIsModalOpen(false);
-    showToast(t.deliveries.saved);
-  };
-
-  const handleSettleSave = (settledDelivery: Delivery) => {
-    const updatedDeliveries = deliveries.map(d => d.id === settledDelivery.id ? settledDelivery : d);
-    setDeliveries(updatedDeliveries);
-    api.saveDeliveries(updatedDeliveries);
-    setIsSettleModalOpen(false);
-    showToast(t.deliveries.settled_saved);
+  };  const handleSettleSave = async (settledDelivery: Delivery) => {
+    try {
+      // TODO: Implement updateDelivery in supabaseApi
+      console.warn('Settlement update not implemented yet');
+      await loadData(); // For now, just reload data
+      setIsSettleModalOpen(false);
+      showToast(t.deliveries.settled_saved);
+    } catch (error) {
+      console.error('Error settling delivery:', error);
+      showToast('Error settling delivery', 'error');
+    }
   }
 
   const getClientName = (id: string) => clients.find(c => c.id === id)?.businessName || 'Unknown';
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading deliveries...</span>
+      </div>
+    );
+  }
 
   const filteredDeliveries = useMemo(() => {
     return deliveries.filter(d => {
@@ -122,7 +167,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
           products={products}
           t={t}
           showToast={showToast}
-          onUpdate={() => setDeliveries(api.getDeliveries().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()))}
+          onUpdate={loadData}
         />
       ) : (
         /* Desktop Table View */
@@ -183,7 +228,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
               setSettlingDelivery(null);
             }}
             onUpdate={() => {
-              setDeliveries(api.getDeliveries().sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+              loadData();
             }}
         />
       )}
@@ -233,7 +278,8 @@ const DeliveryFormModal: React.FC<DeliveryFormModalProps> = ({ isOpen, onClose, 
             setItems([]);
             setNotes('');
             setErrors({});
-            setInventory(api.getInventory());
+            // TODO: Calculate inventory from Supabase data
+            console.warn('Inventory calculation not implemented yet');
         }
     }, [isOpen, clients]);
 
