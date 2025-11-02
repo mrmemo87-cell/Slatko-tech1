@@ -607,7 +607,7 @@ class SupabaseApiService {
     return {
       id: dbProduct.id,
       name: dbProduct.name,
-      unit: dbProduct.unit,
+      unit: dbProduct.unit as Unit,
       stock: dbProduct.stock,
       price: dbProduct.price,
       cost: dbProduct.cost,
@@ -648,7 +648,7 @@ class SupabaseApiService {
     return {
       id: dbMaterial.id,
       name: dbMaterial.name,
-      unit: dbMaterial.unit,
+      unit: dbMaterial.unit as MaterialUnit,
       stock: dbMaterial.stock,
       costPerUnit: dbMaterial.cost_per_unit,
       supplier: dbMaterial.supplier || undefined,

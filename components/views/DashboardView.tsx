@@ -131,7 +131,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
     
     const productChart = Object.entries(salesByProduct).map(([productId, data]) => {
         const product = products.find(p => p.id === productId);
-        return { name: product?.name || 'Unknown', Sales: data.revenue };
+        return { name: product?.name || 'Unknown', Sales: (data as any).revenue };
     }).filter(p => p.Sales > 0);
 
     const salesByClient = recentDeliveries.reduce((acc, d) => {
@@ -153,7 +153,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
 
     const clientChart = Object.entries(salesByClient).map(([clientName, data]) => ({
       name: clientName,
-      Sales: data.Sales,
+      Sales: (data as any).Sales,
     })).filter(c => c.Sales > 0);
 
     return { productChart, clientChart };

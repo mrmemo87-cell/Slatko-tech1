@@ -70,12 +70,8 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
         console.warn('Update delivery not implemented yet');
         showToast('Update not implemented yet', 'error');
       } else {
-        // Create new delivery
-        const nextInvoiceNumber = `SL-${(deliveries.length + 1).toString().padStart(3, '0')}`;
-        await supabaseApi.createDelivery({
-          ...deliveryData,
-          invoiceNumber: nextInvoiceNumber
-        });
+        // Create new delivery - API generates invoice number automatically
+        await supabaseApi.createDelivery(deliveryData);
         await loadData(); // Reload all data
         showToast(t.deliveries.saved);
       }
