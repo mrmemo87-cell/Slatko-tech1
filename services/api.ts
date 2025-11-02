@@ -1,10 +1,10 @@
-﻿//   LOCALSTORAGE API DISABLED 
+﻿// ⚠️  LOCALSTORAGE API DISABLED 
 // This file has been disabled to prevent localStorage/Supabase confusion
 // ALL DATA MUST COME FROM SUPABASE ONLY - Use supabaseApi instead
 
 const throwError = (method: string) => {
-  const error =  LOCALHOST API DISABLED - Use supabaseApi.-Force{method}() instead!;
-  console.error(' LOCALSTORAGE API USAGE DETECTED!', error);
+  const error = `❌ LOCALHOST API DISABLED - Use supabaseApi.${method}() instead!`;
+  console.error('🚨 LOCALSTORAGE API USAGE DETECTED!', error);
   throw new Error(error);
 };
 
@@ -39,4 +39,4 @@ export const api = {
   deleteMaterial: () => throwError('deleteMaterial')
 };
 
-console.warn('  localStorage API has been disabled - use supabaseApi for all data operations!');
+console.warn('⚠️  localStorage API has been disabled - use supabaseApi for all data operations!');
