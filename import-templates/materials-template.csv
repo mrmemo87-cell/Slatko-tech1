@@ -1,0 +1,15 @@
+name,unit,stock,cost_per_unit,supplier,min_stock_level,notes
+Flour - All Purpose,kg,50,1.20,Main Supplier,10,Standard baking flour
+Sugar - Granulated,kg,30,0.80,Sweet Supplies Co,5,White granulated sugar
+Butter - Unsalted,kg,20,4.50,Dairy Farm Ltd,5,Premium unsalted butter
+Eggs - Large,dozen,15,3.00,Local Farm,5,Fresh large eggs
+Cocoa Powder,kg,8,8.00,Chocolate Co,2,Premium cocoa powder
+Vanilla Extract,ml,500,0.15,Flavor House,100,Pure vanilla extract
+Baking Powder,kg,5,5.00,Main Supplier,1,Double acting baking powder
+Salt - Fine,kg,10,1.00,Main Supplier,2,Fine table salt
+Milk - Whole,liter,20,1.50,Dairy Farm Ltd,5,Fresh whole milk
+Cream - Heavy,liter,10,3.00,Dairy Farm Ltd,3,35% fat heavy cream
+Almonds - Sliced,kg,3,12.00,Nuts & More,1,Blanched sliced almonds
+Chocolate Chips,kg,5,8.50,Chocolate Co,2,Semi-sweet chocolate chips
+Strawberries - Fresh,kg,2,6.00,Fruit Market,0,Seasonal fresh strawberries
+Lemons,piece,20,0.50,Fruit Market,5,Fresh lemons for juice/zest

@@ -1,0 +1,9 @@
+name,business_name,email,phone,address,credit_limit,payment_term_days,risk_level,notes
+Cafe Central,Cafe Central Downtown,orders@cafecentral.com,+1-555-0201,"123 Main St, Downtown",1000.00,30,LOW,Regular weekly orders
+Restaurant Bella Vista,Bella Vista Fine Dining,purchasing@bellavista.com,+1-555-0202,"456 Oak Ave, Uptown",2000.00,15,LOW,High-end dessert orders
+Coffee Corner,Coffee Corner Bistro,manager@coffeecorner.com,+1-555-0203,"789 Pine St, Midtown",800.00,30,MEDIUM,Pastries and breakfast items
+The Sweet Spot,The Sweet Spot Bakery,orders@sweetspot.com,+1-555-0204,"321 Elm St, Westside",1500.00,20,LOW,Wholesale cake orders
+Marina Hotel,Marina Hotel & Resort,catering@marinahotel.com,+1-555-0205,"654 Beach Blvd, Marina",3000.00,30,LOW,Event catering orders
+Corner Deli,Corner Deli & Market,deli@cornermarket.com,+1-555-0206,"987 1st Ave, Eastside",500.00,14,MEDIUM,Daily bread delivery
+Grand Cafe,Grand Cafe Restaurant,chef@grandcafe.com,+1-555-0207,"147 2nd St, Center",1200.00,21,LOW,Weekend dessert specials
+Sunrise Diner,Sunrise Family Diner,orders@sunrisediner.com,+1-555-0208,"258 3rd Ave, Northside",600.00,30,HIGH,Small but consistent orders

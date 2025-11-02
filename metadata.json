@@ -1,0 +1,5 @@
+{
+  "name": "Slatko Confectionery Management",
+  "description": "A comprehensive B2B management application for 'Slatko', a confectionery business in Bishkek. It helps track production, clients, deliveries, returns, and payments based on a consignment model. All data is stored locally in your browser.",
+  "requestFramePermissions": []
+}

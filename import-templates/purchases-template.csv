@@ -1,0 +1,13 @@
+supplier,date,status,notes,material_name,quantity,unit_cost,total_cost
+Main Supplier,2024-11-01,received,Weekly flour delivery,Flour - All Purpose,25,1.20,30.00
+Main Supplier,2024-11-01,received,Weekly flour delivery,Sugar - Granulated,10,0.80,8.00
+Main Supplier,2024-11-01,received,Weekly flour delivery,Baking Powder,2,5.00,10.00
+Dairy Farm Ltd,2024-10-30,received,Fresh dairy products,Butter - Unsalted,15,4.50,67.50
+Dairy Farm Ltd,2024-10-30,received,Fresh dairy products,Eggs - Large,20,3.00,60.00
+Dairy Farm Ltd,2024-10-30,received,Fresh dairy products,Milk - Whole,12,1.50,18.00
+Chocolate Co,2024-10-28,received,Monthly chocolate order,Cocoa Powder,5,8.00,40.00
+Chocolate Co,2024-10-28,received,Monthly chocolate order,Chocolate Chips,3,8.50,25.50
+Flavor House,2024-10-25,received,Specialty ingredients,Vanilla Extract,1000,0.15,150.00
+Nuts & More,2024-10-20,received,Premium nuts order,Almonds - Sliced,2,12.00,24.00
+Fruit Market,2024-10-15,received,Fresh produce,Strawberries - Fresh,5,6.00,30.00
+Fruit Market,2024-10-15,received,Fresh produce,Lemons,50,0.50,25.00

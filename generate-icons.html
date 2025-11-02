@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Slatko Icon Generator</title>
+</head>
+<body>
+    <script>
+        // Simple icon generator for PWA
+        function generateIcon(size) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+            
+            // Background
+            ctx.fillStyle = '#3B82F6';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Simple cake/confectionery icon
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size * 0.3;
+            
+            // Base (cake)
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(centerX - radius, centerY, radius * 2, radius * 0.8);
+            
+            // Top layer
+            ctx.fillRect(centerX - radius * 0.8, centerY - radius * 0.3, radius * 1.6, radius * 0.6);
+            
+            // Cherry on top
+            ctx.fillStyle = '#EF4444';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY - radius * 0.4, radius * 0.2, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            return canvas.toDataURL('image/png');
+        }
+        
+        // Generate icons for all required sizes
+        const sizes = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512];
+        
+        sizes.forEach(size => {
+            const iconData = generateIcon(size);
+            const link = document.createElement('a');
+            link.download = `icon-${size}x${size}.png`;
+            link.href = iconData;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        
+        console.log('Icons generated! Place them in the /public/icons/ directory');
+    </script>
+    <p>Check your downloads folder for generated icons!</p>
+</body>
+</html>

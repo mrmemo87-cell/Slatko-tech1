@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <!-- PWA and Mobile Optimization -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#3B82F6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Slatko" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Icons and Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+    
+    <!-- SEO and Description -->
+    <meta name="description" content="Mobile-first bakery and confectionery management system for orders, production, inventory, and customer management." />
+    <meta name="keywords" content="bakery, confectionery, management, POS, inventory, mobile, orders, production" />
+    <meta name="author" content="Slatko Team" />
+    
+    <title>Slatko Confectionery Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Mobile-First Styles -->
+    <link rel="stylesheet" href="/mobile-styles.css" />
+    
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('✅ Service Worker registered successfully:', registration);
+              
+              // Listen for service worker updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New service worker installed, show update notification
+                    console.log('🔄 New version available! Please refresh the page.');
+                    
+                    // You could show a toast notification here
+                    if (window.showToast) {
+                      window.showToast('New version available! Refresh to update.', 'info');
+                    }
+                  }
+                });
+              });
+            })
+            .catch((error) => {
+              console.error('❌ Service Worker registration failed:', error);
+            });
+        });
+
+        // Listen for service worker messages
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          console.log('📱 Message from Service Worker:', event.data);
+          
+          if (event.data.type === 'sync-update') {
+            // Handle offline sync updates
+            const { type, request } = event.data.data;
+            
+            if (type === 'success') {
+              console.log('✅ Offline request synced successfully:', request.url);
+              if (window.showToast) {
+                window.showToast('Offline changes synchronized!', 'success');
+              }
+            } else if (type === 'expired') {
+              console.log('⏰ Offline request expired:', request.url);
+              if (window.showToast) {
+                window.showToast('Some offline changes could not be synchronized.', 'error');
+              }
+            }
+            
+            // Refresh data if needed
+            if (window.refreshData) {
+              window.refreshData();
+            }
+          }
+        });
+      }
+
+      // PWA Install Prompt
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('📱 PWA install prompt available');
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show custom install button/banner
+        if (window.showInstallPrompt) {
+          window.showInstallPrompt();
+        }
+      });
+
+      // Handle PWA installation
+      window.installPWA = async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          
+          if (outcome === 'accepted') {
+            console.log('✅ User accepted the PWA install prompt');
+            if (window.showToast) {
+              window.showToast('App installed successfully!', 'success');
+            }
+          } else {
+            console.log('❌ User dismissed the PWA install prompt');
+          }
+          
+          deferredPrompt = null;
+        }
+      };
+
+      // Detect if running as PWA
+      window.isPWA = () => {
+        return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+      };
+
+      // Network status detection
+      let isOnline = navigator.onLine;
+      
+      const updateOnlineStatus = () => {
+        const wasOffline = !isOnline;
+        isOnline = navigator.onLine;
+        
+        if (wasOffline && isOnline) {
+          console.log('🌐 Connection restored');
+          if (window.showToast) {
+            window.showToast('Connection restored - syncing data...', 'info');
+          }
+          
+          // Trigger background sync
+          if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+            navigator.serviceWorker.ready.then((registration) => {
+              return registration.sync.register('offline-requests');
+            });
+          }
+        } else if (!isOnline) {
+          console.log('📱 Connection lost - working offline');
+          if (window.showToast) {
+            window.showToast('Working offline - changes will sync when connected', 'info');
+          }
+        }
+      };
+
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+
+      // Store offline queue helpers (for service worker)
+      let offlineQueue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
+      
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data.type === 'get-offline-queue') {
+          event.ports[0].postMessage(offlineQueue);
+        } else if (event.data.type === 'set-offline-queue') {
+          offlineQueue = event.data.data;
+          localStorage.setItem('offlineQueue', JSON.stringify(offlineQueue));
+        }
+      });
+
+      console.log('🎉 Slatko PWA initialized and ready!');
+    </script>
+  </body>
+</html>
