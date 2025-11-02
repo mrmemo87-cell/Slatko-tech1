@@ -177,6 +177,17 @@ class SupabaseApiService {
     });
   }
 
+  async deleteProduct(id: string): Promise<void> {
+    return SupabaseService.withErrorHandling(async () => {
+      const response = await supabase
+        .from(TABLES.PRODUCTS)
+        .delete()
+        .eq('id', id);
+      
+      await SupabaseService.handleResponse(response);
+    });
+  }
+
   // Clients API
   async getClients(): Promise<Client[]> {
     return SupabaseService.withErrorHandling(async () => {

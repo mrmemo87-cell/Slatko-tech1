@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { Delivery, DeliveryItem, Client, Product, ReturnItem, Payment, DeliveryStatus } from '../../types';
 import { generateId, formatDate, formatCurrency, todayISO } from '../../utils';
 import { Modal } from '../ui/Modal';

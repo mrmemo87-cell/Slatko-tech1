@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useEffect } from 'react';
+import { supabaseApi } from '../../services/supabase-api';
 import { Product, Unit, Material, RecipeItem } from '../../types';
 import { generateId, formatCurrency } from '../../utils';
 import { PRODUCT_UNITS } from '../../constants';
@@ -14,11 +14,33 @@ interface ProductsViewProps {
 }
 
 export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
-  const [products, setProducts] = useState<Product[]>(api.getProducts());
-  const [materials] = useState<Material[]>(api.getMaterials());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [productsData, materialsData] = await Promise.all([
+        supabaseApi.getProducts(),
+        supabaseApi.getMaterials()
+      ]);
+      setProducts(productsData);
+      setMaterials(materialsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = (product: Product | null = null) => {
     setEditingProduct(product);
@@ -30,25 +52,32 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
     setIsModalOpen(false);
   };
 
-  const handleSave = (productData: Omit<Product, 'id'>) => {
-    let updatedProducts;
-    if (editingProduct) {
-      updatedProducts = products.map(p => p.id === editingProduct.id ? { ...p, ...productData } : p);
-    } else {
-      updatedProducts = [...products, { ...productData, id: generateId() }];
+  const handleSave = async (productData: Omit<Product, 'id'>) => {
+    try {
+      if (editingProduct) {
+        await supabaseApi.updateProduct(editingProduct.id, productData);
+      } else {
+        await supabaseApi.createProduct(productData);
+      }
+      await loadData(); // Reload the data
+      handleCloseModal();
+      showToast(t.products.saved);
+    } catch (error) {
+      console.error('Error saving product:', error);
+      showToast('Error saving product', 'error');
     }
-    setProducts(updatedProducts);
-    api.saveProducts(updatedProducts);
-    handleCloseModal();
-    showToast(t.products.saved);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm(t.products.deleteConfirm)) {
-      const updatedProducts = products.filter(p => p.id !== id);
-      setProducts(updatedProducts);
-      api.saveProducts(updatedProducts);
-      showToast(t.products.deleted);
+      try {
+        await supabaseApi.deleteProduct(id);
+        await loadData(); // Reload the data
+        showToast(t.products.deleted);
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        showToast('Error deleting product', 'error');
+      }
     }
   };
 
