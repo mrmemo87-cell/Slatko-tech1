@@ -1,11 +1,11 @@
 -- Fix User Sync: Sync auth.users with public.users table
 -- Run this in Supabase SQL Editor
 
--- 1. First, let's see the current state
-SELECT 'AUTH USERS:' as table_type, id, email, created_at FROM auth.users
+-- 1. First, let's see the current state (fixed type casting)
+SELECT 'AUTH USERS' as table_type, id::text as user_id, email, created_at::text as created FROM auth.users
 UNION ALL
-SELECT 'PUBLIC USERS:', auth_user_id::text, username, created_at::text FROM public.users
-ORDER BY created_at;
+SELECT 'PUBLIC USERS' as table_type, auth_user_id::text as user_id, username as email, created_at::text as created FROM public.users
+ORDER BY created;
 
 -- 2. Create missing profiles for existing auth users
 INSERT INTO public.users (auth_user_id, username, role, is_active)
