@@ -86,6 +86,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Create user profile in public.users table
       if (data.user) {
         console.log('Creating user profile for:', data.user.id);
+        
+        // Try to create profile, but handle conflicts gracefully
         const { error: profileError } = await supabase
           .from('users')
           .insert({
@@ -96,7 +98,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          // Don't fail the sign up if profile creation fails
+          
+          // If it's a conflict (user already exists), that's okay
+          if (profileError.code !== '23505') { // 23505 is unique constraint violation
+            console.warn('Profile creation failed, but continuing with signup:', profileError.message);
+          } else {
+            console.log('User profile already exists, continuing...');
+          }
+        } else {
+          console.log('User profile created successfully');
         }
       }
 
