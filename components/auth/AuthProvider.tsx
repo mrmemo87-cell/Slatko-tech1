@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../../config/supabase';
+import { queryClient } from '../../providers/DataProvider';
 
 interface AuthContextType {
   user: User | null;
@@ -26,8 +27,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for changes on auth state (signed in, signed out, etc.)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      
+      // 🔥 CRITICAL: Invalidate all queries on auth changes
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Auth event:', event, '- Invalidating all data queries');
+        queryClient.invalidateQueries();
+        
+        // Clear localStorage on sign out for security
+        if (event === 'SIGNED_OUT') {
+          localStorage.clear();
+          console.log('🧹 Cleared localStorage on sign out');
+        }
+      }
       setLoading(false);
     });
 

@@ -16,6 +16,7 @@ import { BusinessMetricsDashboard } from './components/views/BusinessMetricsDash
 import { MobileActionButton } from './components/ui/MobileActionButton';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { LoginForm } from './components/auth/LoginForm';
+import { DataProvider } from './providers/DataProvider';
 import { translations } from './i18n/translations';
 import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
@@ -33,11 +34,31 @@ const AppContent: React.FC = () => {
 
   const t = useMemo(() => translations[lang], [lang]);
 
-  // Force database loading on app start - CRITICAL for multi-user access
+  // One-time migration and setup - CRITICAL for data source consistency
   useEffect(() => {
-    console.log('🔥 FORCE LOADING DATABASE DATA FOR ALL USERS 🔥');
-    // This ensures all users see the same database data, not localStorage
-  }, []);
+    const initializeDataSources = async () => {
+      if (user) {
+        console.log('🔥 INITIALIZING SUPABASE AS SINGLE SOURCE OF TRUTH 🔥');
+        
+        try {
+          // Import migration utilities
+          const { migrateLocalStorageToSupabase } = await import('./utils/migration');
+          const result = await migrateLocalStorageToSupabase();
+          
+          if (result.success) {
+            console.log('✅ Migration completed successfully');
+            showToast('Data migration completed - using database', 'success');
+          } else if (result.errors.length > 0) {
+            console.error('❌ Migration errors:', result.errors);
+          }
+        } catch (error) {
+          console.error('❌ Migration failed:', error);
+        }
+      }
+    };
+
+    initializeDataSources();
+  }, [user]); // Run when user auth state changes
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -241,8 +262,10 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <DataProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </DataProvider>
   );
 }
