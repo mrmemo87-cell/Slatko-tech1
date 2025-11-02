@@ -54,7 +54,14 @@ export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) 
 
   const handleSave = async (batchData: Omit<ProductionBatch, 'id'>) => {
     try {
-      await supabaseApi.createProductionBatch(batchData);
+      // Transform the data to match API expectations
+      const apiData = {
+        productId: batchData.productId,
+        quantity: batchData.quantity,
+        startDate: batchData.date,
+        notes: batchData.notes
+      };
+      await supabaseApi.createProductionBatch(apiData);
       await loadData();
       handleCloseModal();
       showToast(t.production.saved);
@@ -124,10 +131,10 @@ export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) 
         <MobileProductionList
           batches={filteredBatches}
           products={products}
-          materials={api.getMaterials()}
+          materials={materials}
           t={t}
           showToast={showToast}
-          onUpdate={() => setBatches(api.getProduction())}
+          onUpdate={loadData}
         />
       ) : (
         /* Desktop Table View */
@@ -260,7 +267,7 @@ interface ProductionFormModalProps {
 }
 
 const ProductionFormModal: React.FC<ProductionFormModalProps> = ({ isOpen, onClose, onSave, products, t, showToast }) => {
-  const [materials, setMaterials] = useState<Material[]>(api.getMaterials());
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [formData, setFormData] = useState({
     date: todayISO(),
     productId: '',
@@ -270,7 +277,17 @@ const ProductionFormModal: React.FC<ProductionFormModalProps> = ({ isOpen, onClo
   
   useEffect(() => {
     if (isOpen) {
-        setMaterials(api.getMaterials()); // refresh materials on open
+        // Load materials from supabase
+        const loadMaterials = async () => {
+          try {
+            const materialsList = await supabaseApi.getMaterials();
+            setMaterials(materialsList);
+          } catch (error) {
+            console.error('Error loading materials:', error);
+          }
+        };
+        loadMaterials();
+        
         setFormData({
           date: todayISO(),
           productId: products.length > 0 ? products[0].id : '',
