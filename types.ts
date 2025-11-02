@@ -10,6 +10,7 @@ export interface Material {
   unit: MaterialUnit;
   stock: number;
   lowStockThreshold: number;
+  minStockLevel?: number; // Alternative name for lowStockThreshold
   // Enhanced inventory management
   expirationDate?: string; // ISO 8601 format
   supplier?: string;
@@ -43,6 +44,11 @@ export interface Product {
   name: string;
   unit: Unit;
   defaultPrice: number;
+  price?: number; // Current selling price
+  stock?: number; // Current stock level
+  cost?: number; // Production cost
+  category?: string; // Product category
+  description?: string; // Product description
   recipe?: RecipeItem[]; // Recipe / Bill of Materials
 }
 
@@ -52,6 +58,7 @@ export interface Client {
   businessName: string;
   phone: string;
   address: string;
+  email?: string; // Client email
   customPrices: { productId: string; price: number; }[];
   // Enhanced client management
   creditLimit?: number;
@@ -70,6 +77,7 @@ export interface ProductionBatch {
   productId: string;
   quantity: number;
   notes?: string;
+  batchNumber?: string; // Batch identification number
   // Enhanced production tracking
   materialCosts?: { materialId: string; quantity: number; cost: number; }[];
   laborHours?: number;

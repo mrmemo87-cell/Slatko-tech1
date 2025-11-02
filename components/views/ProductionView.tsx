@@ -16,6 +16,7 @@ interface ProductionViewProps {
 export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) => {
   const [batches, setBatches] = useState<ProductionBatch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBatch] = useState<ProductionBatch | null>(null); // Editing not implemented to prevent complex stock recalculations
@@ -30,12 +31,14 @@ export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [batchesData, productsData] = await Promise.all([
+      const [batchesData, productsData, materialsData] = await Promise.all([
         supabaseApi.getProductionBatches(),
-        supabaseApi.getProducts()
+        supabaseApi.getProducts(),
+        supabaseApi.getMaterials()
       ]);
       setBatches(batchesData);
       setProducts(productsData);
+      setMaterials(materialsData);
     } catch (error) {
       console.error('Error loading production data:', error);
       showToast('Error loading data', 'error');
