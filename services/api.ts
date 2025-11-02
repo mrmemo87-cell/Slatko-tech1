@@ -1,23 +1,13 @@
 
-import { Product, Client, ProductionBatch, Delivery, Material, Purchase, InventoryDetail, RecipeItem } from '../types';
-import { generateId } from '../utils';
+// ⚠️  LOCALSTORAGE API DISABLED 
+// This file has been disabled to prevent localStorage/Supabase confusion
+// ALL DATA MUST COME FROM SUPABASE ONLY - Use supabaseApi instead
 
-// --- LocalStorage Wrapper ---
-const getFromStorage = <T,>(key: string, defaultValue: T): T => {
-  try {
-    const item = window.localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
-  } catch (error) {
-    console.error(`Error reading from localStorage key “${key}”:`, error);
-    return defaultValue;
-  }
+const throwError = (method: string) => {
+  const error = `❌ LOCALHOST API DISABLED - Use supabaseApi.${method}() instead!`;
+  console.error('🚨 LOCALSTORAGE API USAGE DETECTED!', error);
+  throw new Error(error);
 };
-
-const saveToStorage = <T,>(key: string, value: T) => {
-  try {
-    const item = JSON.stringify(value);
-    window.localStorage.setItem(key, item);
-  } catch (error) {
     console.error(`Error writing to localStorage key “${key}”:`, error);
   }
 };
@@ -295,4 +285,20 @@ class SlatkoAPI {
   };
 }
 
-export const api = new SlatkoAPI();
+// Export disabled API that throws errors
+export const api = {
+  // All localStorage methods disabled - use supabaseApi instead
+  getProducts: () => throwError('getProducts'),
+  getClients: () => throwError('getClients'),
+  getMaterials: () => throwError('getMaterials'),
+  getDeliveries: () => throwError('getDeliveries'),
+  getProduction: () => throwError('getProductionBatches'),
+  getPurchases: () => throwError('getPurchases'),
+  getInventory: () => throwError('calculate inventory from Supabase data'),
+  getInventoryDetail: () => throwError('calculate inventory from Supabase data'),
+  addProductionBatch: () => throwError('createProductionBatch'),
+  deleteProductionBatch: () => throwError('deleteProductionBatch'),
+  saveDeliveries: () => throwError('use individual delivery methods'),
+  addPurchase: () => throwError('addPurchase'),
+  deletePurchase: () => throwError('deletePurchase'),
+};

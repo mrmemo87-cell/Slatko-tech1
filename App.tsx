@@ -139,39 +139,64 @@ const AppContent: React.FC = () => {
     <>
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
       <div className={`flex h-screen bg-slate-100 dark:bg-slate-900 ${isDarkMode ? 'dark' : ''}`}>
-        {/* Mobile Overlay */}
+        {/* Mobile Full Menu Overlay */}
         {isSidebarOpen && (
-          <div 
-            className="sidebar-overlay fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
+          <div className="lg:hidden fixed inset-0 bg-white dark:bg-slate-800 z-50 overflow-y-auto">
+            <div className="p-4">
+              {/* Header with close button */}
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center">
+                  <SlatkoIcon className="h-8 w-8 text-blue-600" />
+                  <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko Menu</span>
+                </div>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  aria-label="Close menu"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Mobile menu items in a grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <NavItem icon={<MaterialsIcon />} label={t.navigation.materials} id="materials" />
+                <NavItem icon={<PurchasesIcon />} label={t.navigation.purchases} id="purchases" />
+                <NavItem icon={<ProductionIcon />} label={t.navigation.production} id="production" />
+                <NavItem icon={<InventoryIcon />} label={t.navigation.inventory} id="inventory" />
+                <NavItem icon={<ReportsIcon />} label={t.navigation.reports} id="reports" />
+                <NavItem icon={<BusinessIntelligenceIcon />} label={t.navigation.businessIntelligence} id="business-intelligence" />
+                <NavItem icon={<ImportIcon />} label="Import Data" id="import" />
+              </div>
+              
+              {/* Settings section */}
+              <div className="mt-8 space-y-2">
+                <hr className="my-4 border-slate-200 dark:border-slate-700" />
+                <button onClick={toggleLanguage} className="flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200">
+                    <LanguageIcon />
+                    <span className="ml-3">{lang === 'en' ? 'Русский' : 'English'}</span>
+                </button>
+                <button onClick={toggleTheme} className="flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200">
+                    {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                    <span className="ml-3">{isDarkMode ? t.navigation.lightMode : t.navigation.darkMode}</span>
+                </button>
+                <hr className="my-2 border-slate-200 dark:border-slate-700" />
+                <button onClick={signOut} className="flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200">
+                    <LogoutIcon />
+                    <span className="ml-3">Sign Out</span>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         
-        {/* Sidebar - Mobile First Design */}
-        <aside className={`
-          no-print flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 
-          transition-transform duration-300 ease-in-out z-50
-          ${isSidebarOpen 
-            ? 'fixed inset-y-0 left-0 w-80 transform translate-x-0 md:w-64' 
-            : 'fixed inset-y-0 left-0 w-80 transform -translate-x-full md:w-64'
-          }
-          lg:relative lg:translate-x-0 lg:w-64 lg:flex
-        `}>
-          <div className="flex items-center justify-between mb-8 px-2">
-            <div className="flex items-center">
-              <SlatkoIcon className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>
-            </div>
-            {/* Close button for mobile */}
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-              aria-label="Close menu"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        {/* Desktop Sidebar - Hidden on Mobile */}
+        <aside className="no-print hidden lg:flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 w-64">
+          <div className="flex items-center mb-8 px-2">
+            <SlatkoIcon className="h-8 w-8 text-blue-600" />
+            <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>
           </div>
           <nav className="flex-1 space-y-2">
             <NavItem icon={<DashboardIcon />} label={t.navigation.dashboard} id="dashboard" />
@@ -210,19 +235,8 @@ const AppContent: React.FC = () => {
           {/* Header with Menu Button and Alert Center */}
           <div className="no-print bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 md:px-8 py-4">
             <div className="flex justify-between items-center">
-              {/* Mobile Menu Button - Larger tap target */}
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-3 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 dark:active:bg-slate-600"
-                aria-label="Open menu"
-              >
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              
-              {/* Logo on Mobile */}
-              <div className="flex items-center lg:hidden">
+              {/* Logo - Always visible */}
+              <div className="flex items-center">
                 <SlatkoIcon className="h-6 w-6 text-blue-600" />
                 <span className="ml-2 text-lg font-bold text-slate-800 dark:text-white">Slatko</span>
               </div>
@@ -231,12 +245,63 @@ const AppContent: React.FC = () => {
             </div>
           </div>
           
-          {/* Main Content */}
-          <div className="p-4 sm:p-6 md:p-8">
+          {/* Main Content - Add bottom padding for mobile nav */}
+          <div className="p-4 sm:p-6 md:p-8 pb-20 lg:pb-8">
             {renderView()}
           </div>
         </main>
         
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 z-50">
+          <div className="flex justify-around items-center py-2">
+            <button
+              onClick={() => setView('dashboard')}
+              className={`flex flex-col items-center p-2 rounded-lg ${
+                view === 'dashboard' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <DashboardIcon />
+              <span className="text-xs mt-1">Dashboard</span>
+            </button>
+            <button
+              onClick={() => setView('products')}
+              className={`flex flex-col items-center p-2 rounded-lg ${
+                view === 'products' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <ProductsIcon />
+              <span className="text-xs mt-1">Products</span>
+            </button>
+            <button
+              onClick={() => setView('clients')}
+              className={`flex flex-col items-center p-2 rounded-lg ${
+                view === 'clients' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <ClientsIcon />
+              <span className="text-xs mt-1">Clients</span>
+            </button>
+            <button
+              onClick={() => setView('deliveries')}
+              className={`flex flex-col items-center p-2 rounded-lg ${
+                view === 'deliveries' ? 'text-blue-600' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <DeliveriesIcon />
+              <span className="text-xs mt-1">Orders</span>
+            </button>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex flex-col items-center p-2 rounded-lg text-slate-600 dark:text-slate-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span className="text-xs mt-1">More</span>
+            </button>
+          </div>
+        </nav>
+
         {/* Mobile Action Button */}
         <MobileActionButton t={t} showToast={showToast} />
       </div>

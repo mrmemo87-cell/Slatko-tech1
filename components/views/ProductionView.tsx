@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { api } from '../../services/api';
+import { supabaseApi } from '../../services/supabase-api';
 import { ProductionBatch, Product, Material } from '../../types';
 import { formatDate, todayISO } from '../../utils';
 import { Modal } from '../ui/Modal';
@@ -14,13 +14,35 @@ interface ProductionViewProps {
 }
 
 export const ProductionView: React.FC<ProductionViewProps> = ({ t, showToast }) => {
-  const [batches, setBatches] = useState<ProductionBatch[]>(api.getProduction());
-  const [products] = useState<Product[]>(api.getProducts());
+  const [batches, setBatches] = useState<ProductionBatch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBatch] = useState<ProductionBatch | null>(null); // Editing not implemented to prevent complex stock recalculations
   const [searchTerm, setSearchTerm] = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [batchesData, productsData] = await Promise.all([
+        supabaseApi.getProductionBatches(),
+        supabaseApi.getProducts()
+      ]);
+      setBatches(batchesData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading production data:', error);
+      showToast('Error loading data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenModal = () => {
     setIsModalOpen(true);

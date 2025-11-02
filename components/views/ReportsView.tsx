@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useMemo, useEffect } from 'react';
+import { supabaseApi } from '../../services/supabase-api';
 import { Delivery, Product } from '../../types';
 import { formatCurrency, exportToCsv, todayISO } from '../../utils';
 
@@ -10,12 +10,42 @@ interface ReportsViewProps {
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ t }) => {
-  const [deliveries] = useState<Delivery[]>(api.getDeliveries());
-  const [products] = useState<Product[]>(api.getProducts());
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     to: todayISO()
   });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [deliveriesData, productsData] = await Promise.all([
+        supabaseApi.getDeliveries(),
+        supabaseApi.getProducts()
+      ]);
+      setDeliveries(deliveriesData);
+      setProducts(productsData);
+    } catch (error) {
+      console.error('Error loading reports data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading reports...</span>
+      </div>
+    );
+  }
 
   const reportData = useMemo(() => {
     const fromDate = new Date(dateRange.from);
