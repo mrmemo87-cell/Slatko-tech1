@@ -4,6 +4,22 @@
   .desktop-nav {
     display: none;
   }
+
+  /* Mobile sidebar fixes */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+  
+  /* Ensure sidebar is above everything on mobile */
+  aside[class*="z-50"] {
+    z-index: 9999 !important;
+  }
+  
+  /* Mobile overlay */
+  .sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+  }
   
   /* Mobile table optimizations */
   .mobile-table-card {

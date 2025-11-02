@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardView } from './components/views/DashboardView';
 import { ProductsView } from './components/views/ProductsView';
 import { ClientsView } from './components/views/ClientsView';
@@ -32,6 +32,18 @@ const AppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const t = useMemo(() => translations[lang], [lang]);
+
+  // Handle body scroll lock on mobile when sidebar is open
+  React.useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.classList.add('sidebar-open');
+    } else {
+      document.body.classList.remove('sidebar-open');
+    }
+    
+    // Cleanup on unmount
+    return () => document.body.classList.remove('sidebar-open');
+  }, [isSidebarOpen]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     const id = generateId();
@@ -130,18 +142,36 @@ const AppContent: React.FC = () => {
         {/* Mobile Overlay */}
         {isSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            className="sidebar-overlay fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
         
-        {/* Sidebar */}
-        <aside className={`no-print flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 transition-all duration-300 z-50 ${
-          isSidebarOpen ? 'fixed inset-y-0 left-0 w-64 lg:relative lg:translate-x-0' : 'hidden lg:flex lg:w-64'
-        }`}>
-          <div className="flex items-center mb-8 px-2">
-            <SlatkoIcon className="h-8 w-8 text-blue-600" />
-            <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>
+        {/* Sidebar - Mobile First Design */}
+        <aside className={`
+          no-print flex flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-4 
+          transition-transform duration-300 ease-in-out z-50
+          ${isSidebarOpen 
+            ? 'fixed inset-y-0 left-0 w-80 transform translate-x-0 md:w-64' 
+            : 'fixed inset-y-0 left-0 w-80 transform -translate-x-full md:w-64'
+          }
+          lg:relative lg:translate-x-0 lg:w-64 lg:flex
+        `}>
+          <div className="flex items-center justify-between mb-8 px-2">
+            <div className="flex items-center">
+              <SlatkoIcon className="h-8 w-8 text-blue-600" />
+              <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>
+            </div>
+            {/* Close button for mobile */}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              aria-label="Close menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <nav className="flex-1 space-y-2">
             <NavItem icon={<DashboardIcon />} label={t.navigation.dashboard} id="dashboard" />
@@ -180,12 +210,13 @@ const AppContent: React.FC = () => {
           {/* Header with Menu Button and Alert Center */}
           <div className="no-print bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 md:px-8 py-4">
             <div className="flex justify-between items-center">
-              {/* Mobile Menu Button */}
+              {/* Mobile Menu Button - Larger tap target */}
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="lg:hidden p-3 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:bg-slate-200 dark:active:bg-slate-600"
+                aria-label="Open menu"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
