@@ -28,21 +28,33 @@ class WorkflowService {
 
       if (deliveryError) throw deliveryError;
 
-      // Log workflow event
-      await this.logWorkflowEvent(deliveryId, newStage, userId, userRole, notes, metadata);
+      // Run background operations in parallel (don't block UI)
+      const backgroundTasks = [];
+      
+      // Log workflow event (async, non-blocking)
+      backgroundTasks.push(
+        this.logWorkflowEvent(deliveryId, newStage, userId, userRole, notes, metadata)
+          .catch(err => console.warn('Workflow logging failed:', err))
+      );
 
-      // Trigger real-time updates
-      await this.broadcastWorkflowUpdate(deliveryId, newStage);
-
-      // Update production tasks if needed
+      // Update production tasks if needed (async, non-blocking)
       if (newStage === 'in_production') {
-        await this.createProductionTasks(deliveryId);
+        backgroundTasks.push(
+          this.createProductionTasks(deliveryId)
+            .catch(err => console.warn('Production tasks creation failed:', err))
+        );
       }
 
-      // Update delivery routes if ready for delivery
+      // Update delivery routes if ready for delivery (async, non-blocking)
       if (newStage === 'ready_for_delivery') {
-        await this.addToDeliveryRoute(deliveryId);
+        backgroundTasks.push(
+          this.addToDeliveryRoute(deliveryId)
+            .catch(err => console.warn('Delivery route update failed:', err))
+        );
       }
+
+      // Run all background tasks in parallel, don't await them
+      Promise.all(backgroundTasks);
 
     } catch (error) {
       console.error('Error updating workflow stage:', error);
@@ -161,18 +173,10 @@ class WorkflowService {
 
   // Real-time broadcasting
   async broadcastWorkflowUpdate(deliveryId: string, stage: WorkflowStage): Promise<void> {
-    // Broadcast to all connected clients
-    const channel = supabase.channel('workflow-updates');
-    
-    channel.send({
-      type: 'broadcast',
-      event: 'workflow_stage_updated',
-      payload: {
-        delivery_id: deliveryId,
-        stage: stage,
-        timestamp: new Date().toISOString()
-      }
-    });
+    // Skip real-time broadcasting for better performance
+    // The UI will refresh on next load or manual refresh
+    console.log(`📡 Workflow update: ${deliveryId} → ${stage}`);
+    return Promise.resolve();
   }
 
   // Subscribe to real-time workflow updates

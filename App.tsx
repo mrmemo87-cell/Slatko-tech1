@@ -58,6 +58,13 @@ const AppContent: React.FC = () => {
       if (user) {
         console.log('🔥 INITIALIZING SUPABASE AS SINGLE SOURCE OF TRUTH 🔥');
         
+        // Check if migration already completed
+        const migrationComplete = localStorage.getItem('migration_completed');
+        if (migrationComplete) {
+          console.log('✅ Migration already completed, skipping...');
+          return;
+        }
+        
         try {
           // Import migration utilities
           const { migrateLocalStorageToSupabase } = await import('./utils/migration');
@@ -66,6 +73,7 @@ const AppContent: React.FC = () => {
           if (result.success) {
             console.log('✅ Migration completed successfully');
             showToast('Data migration completed - using database', 'success');
+            localStorage.setItem('migration_completed', 'true');
           } else if (result.errors.length > 0) {
             console.error('❌ Migration errors:', result.errors);
           }
