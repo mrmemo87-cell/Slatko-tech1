@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { supabaseApi } from '../../services/supabase-api';
+import React, { useState } from 'react';
 import { Product, Unit, Material, RecipeItem } from '../../types';
 import { generateId, formatCurrency } from '../../utils';
 import { PRODUCT_UNITS } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { PlusIcon, EditIcon, DeleteIcon } from '../ui/Icons';
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useMaterials } from '../../hooks/useDataQueries';
+import { PRODUCT_CATEGORIES, groupProductsByCategory } from '../../constants/productCategories';
 
 interface ProductsViewProps {
   // FIX: Changed 't' prop type from TranslationFunction to 'any' to match the shape of the translation object.
@@ -14,33 +15,19 @@ interface ProductsViewProps {
 }
 
 export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
+  // Use React Query hooks
+  const { data: products = [], isLoading: productsLoading, error: productsError } = useProducts();
+  const { data: materials = [], isLoading: materialsLoading } = useMaterials();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [productsData, materialsData] = await Promise.all([
-        supabaseApi.getProducts(),
-        supabaseApi.getMaterials()
-      ]);
-      setProducts(productsData);
-      setMaterials(materialsData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      showToast('Error loading data', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(Object.keys(PRODUCT_CATEGORIES))); // Start with all expanded
+  
+  const loading = productsLoading || materialsLoading;
 
   const handleOpenModal = (product: Product | null = null) => {
     setEditingProduct(product);
@@ -52,14 +39,13 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
     setIsModalOpen(false);
   };
 
-  const handleSave = async (productData: Omit<Product, 'id'>) => {
+  const saveProduct = async (productData: Omit<Product, 'id'>) => {
     try {
       if (editingProduct) {
-        await supabaseApi.updateProduct(editingProduct.id, productData);
+        await updateProduct.mutateAsync({ id: editingProduct.id, data: productData });
       } else {
-        await supabaseApi.createProduct(productData);
+        await createProduct.mutateAsync(productData);
       }
-      await loadData(); // Reload the data
       handleCloseModal();
       showToast(t.products.saved);
     } catch (error) {
@@ -71,8 +57,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
   const handleDelete = async (id: string) => {
     if (window.confirm(t.products.deleteConfirm)) {
       try {
-        await supabaseApi.deleteProduct(id);
-        await loadData(); // Reload the data
+        await deleteProduct.mutateAsync(id);
         showToast(t.products.deleted);
       } catch (error) {
         console.error('Error deleting product:', error);
@@ -104,41 +89,103 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
         className="w-full p-2 border border-slate-300 rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
       />
 
-      <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg overflow-hidden">
-        <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-          <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-300">
-            <tr>
-              <th scope="col" className="px-6 py-3">{t.products.name}</th>
-              <th scope="col" className="px-6 py-3">{t.products.unit}</th>
-              <th scope="col" className="px-6 py-3">{t.products.defaultPrice}</th>
-              <th scope="col" className="px-6 py-3 text-right">{t.products.actions}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map(product => (
-              <tr key={product.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
-                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">{product.name}</td>
-                <td className="px-6 py-4">{product.unit}</td>
-                <td className="px-6 py-4">{formatCurrency(product.defaultPrice)}</td>
-                <td className="px-6 py-4 text-right space-x-2">
-                  <button onClick={() => handleOpenModal(product)} className="text-blue-600 hover:text-blue-800"><EditIcon /></button>
-                  <button onClick={() => handleDelete(product.id)} className="text-red-600 hover:text-red-800"><DeleteIcon /></button>
-                </td>
-              </tr>
-            ))}
-             {filteredProducts.length === 0 && (
-              <tr>
-                <td colSpan={4} className="text-center py-4">{t.common.noResults}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-4">
+        {Object.entries(groupProductsByCategory(filteredProducts)).map(([categoryName, categoryProducts]) => {
+          const isExpanded = expandedCategories.has(categoryName);
+          
+          return (
+            <div key={categoryName} className="bg-white dark:bg-slate-800 shadow-md rounded-lg overflow-hidden">
+              {/* Category Header */}
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedCategories);
+                  if (isExpanded) {
+                    newExpanded.delete(categoryName);
+                  } else {
+                    newExpanded.add(categoryName);
+                  }
+                  setExpandedCategories(newExpanded);
+                }}
+                className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-white">{categoryName}</h3>
+                  <span className="bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 text-xs px-2 py-1 rounded-full">
+                    {categoryProducts.length} products
+                  </span>
+                </div>
+              </button>
+              
+              {/* Category Products */}
+              {isExpanded && (
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {categoryProducts.map(product => (
+                    <div key={product.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-slate-900 dark:text-white">{product.name}</h4>
+                          <div className="flex items-center space-x-4 mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            <span>{product.unit}</span>
+                            <span className="font-medium text-green-600 dark:text-green-400">
+                              {formatCurrency(product.defaultPrice)}
+                            </span>
+                            {product.recipe && (
+                              <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                                {product.recipe.length} ingredients
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleOpenModal(product)}
+                            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          >
+                            <DeleteIcon />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {categoryProducts.length === 0 && searchTerm && (
+                    <div className="p-4 text-center text-slate-500 dark:text-slate-400">
+                      No products in this category match your search
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        
+        {filteredProducts.length === 0 && !searchTerm && (
+          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+            No products found. Click "Add Product" to create your first product.
+          </div>
+        )}
+        
+        {filteredProducts.length === 0 && searchTerm && (
+          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+            {t.common.noResults}
+          </div>
+        )}
       </div>
 
       <ProductFormModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSave={handleSave}
+        onSave={saveProduct}
         product={editingProduct}
         materials={materials}
         t={t}

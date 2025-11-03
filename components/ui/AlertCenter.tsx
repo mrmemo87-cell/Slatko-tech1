@@ -13,9 +13,19 @@ export const AlertCenter: React.FC<AlertCenterProps> = ({ t }) => {
   const [filter, setFilter] = useState<'ALL' | AlertPriority>('ALL');
 
   useEffect(() => {
-    const loadAlerts = () => {
-      const activeAlerts = businessIntelligence.getActiveAlerts();
-      setAlerts(activeAlerts);
+    const loadAlerts = async () => {
+      try {
+        // Generate fresh alerts first
+        await businessIntelligence.generateAllAlerts();
+        // Then get the active ones
+        const activeAlerts = businessIntelligence.getActiveAlerts();
+        setAlerts(activeAlerts);
+      } catch (error) {
+        console.error('Error loading alerts:', error);
+        // Fallback to just getting existing alerts
+        const activeAlerts = businessIntelligence.getActiveAlerts();
+        setAlerts(activeAlerts);
+      }
     };
 
     loadAlerts();

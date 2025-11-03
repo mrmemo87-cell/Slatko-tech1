@@ -1,5 +1,5 @@
 import { Material, Product, Client, ProductionBatch, Delivery, BusinessAlert, BusinessMetrics, MaterialPrediction, AlertType, AlertPriority } from '../types';
-import { api } from './api';
+import { supabaseApi } from './supabase-api';
 import { generateId } from '../utils';
 
 class BusinessIntelligenceService {
@@ -20,12 +20,13 @@ class BusinessIntelligenceService {
   }
 
   // Generate inventory alerts
-  generateInventoryAlerts(): BusinessAlert[] {
-    const materials = api.getMaterials();
-    const newAlerts: BusinessAlert[] = [];
-    const now = new Date();
+  async generateInventoryAlerts(): Promise<BusinessAlert[]> {
+    try {
+      const materials = await supabaseApi.getMaterials();
+      const newAlerts: BusinessAlert[] = [];
+      const now = new Date();
 
-    materials.forEach(material => {
+      materials.forEach(material => {
       // Low stock alert
       if (material.stock <= material.lowStockThreshold) {
         const priority: AlertPriority = material.stock === 0 ? 'CRITICAL' : 
@@ -78,14 +79,19 @@ class BusinessIntelligenceService {
     });
 
     return newAlerts;
+    } catch (error) {
+      console.error('Error generating inventory alerts:', error);
+      return [];
+    }
   }
 
   // Generate payment alerts
-  generatePaymentAlerts(): BusinessAlert[] {
-    const deliveries = api.getDeliveries();
-    const clients = api.getClients();
-    const newAlerts: BusinessAlert[] = [];
-    const now = new Date();
+  async generatePaymentAlerts(): Promise<BusinessAlert[]> {
+    try {
+      const deliveries = await supabaseApi.getDeliveries();
+      const clients = await supabaseApi.getClients();
+      const newAlerts: BusinessAlert[] = [];
+      const now = new Date();
 
     deliveries.forEach(delivery => {
       if (delivery.status === 'Settled' || delivery.status === 'Pending') {
@@ -130,14 +136,19 @@ class BusinessIntelligenceService {
     });
 
     return newAlerts;
+    } catch (error) {
+      console.error('Error generating payment alerts:', error);
+      return [];
+    }
   }
 
   // Calculate business metrics
-  calculateBusinessMetrics(): BusinessMetrics {
-    const materials = api.getMaterials();
-    const production = api.getProduction();
-    const deliveries = api.getDeliveries();
-    const inventory = api.getInventory();
+  async calculateBusinessMetrics(): Promise<BusinessMetrics> {
+    try {
+      const materials = await supabaseApi.getMaterials();
+      const production = await supabaseApi.getProductionBatches();
+      const deliveries = await supabaseApi.getDeliveries();
+      // Note: Calculate inventory from materials data since there's no direct inventory API
 
     // Total inventory value
     const totalInventoryValue = materials.reduce((sum, material) => {
@@ -198,14 +209,28 @@ class BusinessIntelligenceService {
       qualityScore,
       clientSatisfactionScore
     };
+    } catch (error) {
+      console.error('Error calculating business metrics:', error);
+      // Return default metrics
+      return {
+        totalInventoryValue: 0,
+        lowStockItems: 0,
+        expiringMaterials: 0,
+        productionEfficiency: 0,
+        cashFlowStatus: 0,
+        qualityScore: 0,
+        clientSatisfactionScore: 0
+      };
+    }
   }
 
   // Predict material stockouts
-  predictMaterialStockouts(): MaterialPrediction[] {
-    const materials = api.getMaterials();
-    const production = api.getProduction();
-    const products = api.getProducts();
-    const predictions: MaterialPrediction[] = [];
+  async predictMaterialStockouts(): Promise<MaterialPrediction[]> {
+    try {
+      const materials = await supabaseApi.getMaterials();
+      const production = await supabaseApi.getProductionBatches();
+      const products = await supabaseApi.getProducts();
+      const predictions: MaterialPrediction[] = [];
 
     // Get last 30 days of production for usage patterns
     const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
@@ -253,9 +278,13 @@ class BusinessIntelligenceService {
     return predictions.sort((a, b) => 
       new Date(a.predictedStockoutDate).getTime() - new Date(b.predictedStockoutDate).getTime()
     );
+    } catch (error) {
+      console.error('Error predicting material stockouts:', error);
+      return [];
+    }
   }
 
-  // Get all active alerts
+  // Get all active alerts (simplified version that doesn't generate new alerts)
   getActiveAlerts(): BusinessAlert[] {
     // Remove old alerts (older than 7 days)
     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
@@ -263,9 +292,15 @@ class BusinessIntelligenceService {
       new Date(alert.createdAt) > sevenDaysAgo || !alert.isResolved
     );
 
-    // Generate new alerts
-    const inventoryAlerts = this.generateInventoryAlerts();
-    const paymentAlerts = this.generatePaymentAlerts();
+    // Return existing alerts only (async alert generation moved to separate method)
+    return this.alerts.filter(alert => !alert.isResolved);
+  }
+
+  // Generate all alerts asynchronously
+  async generateAllAlerts(): Promise<void> {
+    try {
+      const inventoryAlerts = await this.generateInventoryAlerts();
+      const paymentAlerts = await this.generatePaymentAlerts();
     
     // Add new alerts (avoid duplicates)
     [...inventoryAlerts, ...paymentAlerts].forEach(newAlert => {
@@ -280,7 +315,9 @@ class BusinessIntelligenceService {
     });
 
     this.saveAlerts();
-    return this.alerts.filter(alert => !alert.isResolved);
+    } catch (error) {
+      console.error('Error generating alerts:', error);
+    }
   }
 
   // Mark alert as read

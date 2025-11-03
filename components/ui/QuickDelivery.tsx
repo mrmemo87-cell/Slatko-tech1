@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Client, Product, DeliveryItem } from '../../types';
 import { supabaseApi } from '../../services/supabase-api';
 import { generateId, todayISO, formatCurrency } from '../../utils';
+import { PRODUCT_CATEGORIES, groupProductsByCategory } from '../../constants/productCategories';
 
 interface QuickDeliveryProps {
   t: any;
@@ -19,6 +20,7 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
   const [cart, setCart] = useState<DeliveryItem[]>([]);
   const [step, setStep] = useState<'client' | 'products' | 'review'>('client');
   const [loading, setLoading] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -120,35 +122,83 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
         </div>
 
         <div className="space-y-3">
-          {products.map(product => {
-            // TODO: Add inventory check with Supabase API if needed
-            const price = selectedClient?.customPrices.find(cp => cp.productId === product.id)?.price || product.defaultPrice;
-            const inCart = cart.find(item => item.productId === product.id)?.quantity || 0;
+          {Object.entries(groupProductsByCategory(products)).map(([categoryName, categoryProducts]) => {
+            const isExpanded = expandedCategories.has(categoryName);
+            const categoryProductsInCart = categoryProducts.filter(product => 
+              cart.find(item => item.productId === product.id)?.quantity > 0
+            ).length;
             
             return (
-              <div key={product.id} className="bg-white border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{product.name}</h4>
-                    <p className="text-sm text-gray-500">{formatCurrency(price)}/{product.unit}</p>
-                    <p className="text-xs text-gray-400">
-                      In cart: {inCart}
-                    </p>
+              <div key={categoryName} className="bg-white border rounded-lg">
+                {/* Category Header */}
+                <button
+                  onClick={() => {
+                    const newExpanded = new Set(expandedCategories);
+                    if (isExpanded) {
+                      newExpanded.delete(categoryName);
+                    } else {
+                      newExpanded.add(categoryName);
+                    }
+                    setExpandedCategories(newExpanded);
+                  }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">{categoryName}</h4>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                      {categoryProducts.length} products
+                    </span>
                   </div>
-                </div>
+                  {categoryProductsInCart > 0 && (
+                    <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full">
+                      {categoryProductsInCart} in cart
+                    </span>
+                  )}
+                </button>
                 
-                {/* Quick quantity buttons */}
-                <div className="grid grid-cols-4 gap-2">
-                  {QUICK_QUANTITIES.slice(0, 8).map(quantity => (
-                    <button
-                      key={quantity}
-                      onClick={() => addToCart(product, quantity)}
-                      className="bg-blue-600 text-white py-2 px-2 rounded text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
-                    >
-                      +{quantity}
-                    </button>
-                  ))}
-                </div>
+                {/* Category Products */}
+                {isExpanded && (
+                  <div className="border-t space-y-2 p-2">
+                    {categoryProducts.map(product => {
+                      const price = selectedClient?.customPrices.find(cp => cp.productId === product.id)?.price || product.defaultPrice;
+                      const inCart = cart.find(item => item.productId === product.id)?.quantity || 0;
+                      
+                      return (
+                        <div key={product.id} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h5 className="font-medium text-gray-900">{product.name}</h5>
+                              <p className="text-sm text-gray-500">{formatCurrency(price)}/{product.unit}</p>
+                              {inCart > 0 && (
+                                <p className="text-xs text-green-600 font-medium">
+                                  In cart: {inCart}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Quick quantity buttons */}
+                          <div className="grid grid-cols-4 gap-2">
+                            {QUICK_QUANTITIES.slice(0, 8).map(quantity => (
+                              <button
+                                key={quantity}
+                                onClick={() => addToCart(product, quantity)}
+                                className="bg-blue-600 text-white py-2 px-2 rounded text-sm font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors"
+                              >
+                                +{quantity}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}

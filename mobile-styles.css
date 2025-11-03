@@ -1,22 +1,12 @@
 /* Mobile-First Responsive Optimizations */
 @media (max-width: 768px) {
-  /* Hide desktop navigation */
+  /* Hide any desktop-only navigation elements */
   .desktop-nav {
     display: none;
   }
 
-  /* Mobile sidebar fixes */
-  body.sidebar-open {
-    overflow: hidden;
-  }
-  
-  /* Ensure sidebar is above everything on mobile */
-  aside[class*="z-50"] {
-    z-index: 9999 !important;
-  }
-  
-  /* Mobile overlay */
-  .sidebar-overlay {
+  /* Mobile overlay for dropdowns */
+  .mobile-overlay {
     background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
   }
@@ -90,10 +80,6 @@
 
 /* Tablet optimizations */
 @media (min-width: 768px) and (max-width: 1024px) {
-  .sidebar-nav {
-    width: 200px;
-  }
-  
   .main-content {
     padding: 1rem;
   }

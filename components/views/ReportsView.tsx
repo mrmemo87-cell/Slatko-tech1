@@ -38,15 +38,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ t }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading reports...</span>
-      </div>
-    );
-  }
-
   const reportData = useMemo(() => {
     const fromDate = new Date(dateRange.from);
     const toDate = new Date(dateRange.to);
@@ -88,6 +79,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ t }) => {
     }).sort((a,b) => b.totalSales - a.totalSales);
 
   }, [dateRange, deliveries, products]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading reports...</span>
+      </div>
+    );
+  }
 
   const handleExport = () => {
     const headers = [t.reports.product, t.reports.quantitySold, t.reports.totalSales];

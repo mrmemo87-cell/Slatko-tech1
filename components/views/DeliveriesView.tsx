@@ -95,6 +95,14 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
 
   const getClientName = (id: string) => clients.find(c => c.id === id)?.businessName || 'Unknown';
 
+  const filteredDeliveries = useMemo(() => {
+    return deliveries.filter(d => {
+      const statusMatch = filter.status === 'All' || d.status === filter.status;
+      const clientMatch = filter.client === 'All' || d.clientId === filter.client;
+      return statusMatch && clientMatch;
+    });
+  }, [deliveries, filter]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -103,14 +111,6 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
       </div>
     );
   }
-
-  const filteredDeliveries = useMemo(() => {
-    return deliveries.filter(d => {
-      const statusMatch = filter.status === 'All' || d.status === filter.status;
-      const clientMatch = filter.client === 'All' || d.clientId === filter.client;
-      return statusMatch && clientMatch;
-    });
-  }, [deliveries, filter]);
   
   const StatusBadge: React.FC<{status: DeliveryStatus}> = ({ status }) => {
     const colorMap: Record<DeliveryStatus, string> = {

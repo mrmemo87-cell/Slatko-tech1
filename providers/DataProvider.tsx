@@ -33,6 +33,11 @@ interface DataProviderProps {
 }
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
+  // Make queryClient globally accessible for cache management
+  React.useEffect(() => {
+    (window as any).queryClient = queryClient;
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
       {children}

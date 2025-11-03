@@ -7,7 +7,9 @@ import type {
   Delivery, 
   DeliveryItem, 
   ReturnItem, 
-  Payment, 
+  Payment,
+  Unit,
+  MaterialUnit, 
   ProductionBatch 
 } from '../types';
 
@@ -608,6 +610,7 @@ class SupabaseApiService {
       id: dbProduct.id,
       name: dbProduct.name,
       unit: dbProduct.unit as Unit,
+      defaultPrice: dbProduct.price || 0,
       stock: dbProduct.stock,
       price: dbProduct.price,
       cost: dbProduct.cost,
@@ -650,6 +653,7 @@ class SupabaseApiService {
       name: dbMaterial.name,
       unit: dbMaterial.unit as MaterialUnit,
       stock: dbMaterial.stock,
+      lowStockThreshold: dbMaterial.min_stock_level || 0,
       costPerUnit: dbMaterial.cost_per_unit,
       supplier: dbMaterial.supplier || undefined,
       expirationDate: dbMaterial.expiration_date || undefined,
@@ -720,6 +724,28 @@ class SupabaseApiService {
   async deletePurchase(id: string): Promise<void> {
     // Placeholder - would need purchases table in schema
     console.warn('Purchases not implemented in Supabase schema yet');
+  }
+
+  async deleteProductionBatch(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('production_batches')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete production batch: ${error.message}`);
+    }
+  }
+
+  async deleteDelivery(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('deliveries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete delivery: ${error.message}`);
+    }
   }
 }
 

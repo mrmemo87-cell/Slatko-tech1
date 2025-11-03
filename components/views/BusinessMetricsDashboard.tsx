@@ -13,14 +13,32 @@ export const BusinessMetricsDashboard: React.FC<BusinessMetricsDashboardProps> =
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = () => {
-      setIsLoading(true);
-      const businessMetrics = businessIntelligence.calculateBusinessMetrics();
-      const materialPredictions = businessIntelligence.predictMaterialStockouts();
-      
-      setMetrics(businessMetrics);
-      setPredictions(materialPredictions);
-      setIsLoading(false);
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [businessMetrics, materialPredictions] = await Promise.all([
+          businessIntelligence.calculateBusinessMetrics(),
+          businessIntelligence.predictMaterialStockouts()
+        ]);
+        
+        setMetrics(businessMetrics);
+        setPredictions(materialPredictions);
+      } catch (error) {
+        console.error('Error loading business intelligence data:', error);
+        // Set default metrics to prevent crashes
+        setMetrics({
+          totalInventoryValue: 0,
+          lowStockItems: 0,
+          expiringMaterials: 0,
+          productionEfficiency: 0,
+          cashFlowStatus: 0,
+          qualityScore: 0,
+          clientSatisfactionScore: 0
+        });
+        setPredictions([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
@@ -101,7 +119,7 @@ export const BusinessMetricsDashboard: React.FC<BusinessMetricsDashboardProps> =
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <MetricCard
           title="Total Inventory Value"
-          value={formatCurrency(metrics.totalInventoryValue)}
+          value={formatCurrency(metrics.totalInventoryValue || 0)}
           icon="💰"
           color="blue"
           subtext="Current material stock value"
@@ -109,33 +127,33 @@ export const BusinessMetricsDashboard: React.FC<BusinessMetricsDashboardProps> =
         
         <MetricCard
           title="Production Efficiency"
-          value={`${metrics.productionEfficiency.toFixed(1)}%`}
+          value={`${(metrics.productionEfficiency || 0).toFixed(1)}%`}
           icon="⚙️"
-          color={getScoreColor(metrics.productionEfficiency)}
+          color={getScoreColor(metrics.productionEfficiency || 0)}
           subtext="Last 30 days performance"
         />
         
         <MetricCard
           title="Quality Score"
-          value={`${metrics.qualityScore.toFixed(1)}%`}
+          value={`${(metrics.qualityScore || 0).toFixed(1)}%`}
           icon="⭐"
-          color={getScoreColor(metrics.qualityScore)}
+          color={getScoreColor(metrics.qualityScore || 0)}
           subtext="Average batch quality"
         />
         
         <MetricCard
           title="Cash Flow Status"
-          value={formatCurrency(metrics.cashFlowStatus)}
-          icon={metrics.cashFlowStatus >= 0 ? "📈" : "📉"}
-          color={getCashFlowColor(metrics.cashFlowStatus)}
+          value={formatCurrency(metrics.cashFlowStatus || 0)}
+          icon={(metrics.cashFlowStatus || 0) >= 0 ? "📈" : "📉"}
+          color={getCashFlowColor(metrics.cashFlowStatus || 0)}
           subtext="Pending receivables"
         />
         
         <MetricCard
           title="Client Satisfaction"
-          value={`${metrics.clientSatisfactionScore.toFixed(1)}%`}
+          value={`${(metrics.clientSatisfactionScore || 0).toFixed(1)}%`}
           icon="😊"
-          color={getScoreColor(metrics.clientSatisfactionScore)}
+          color={getScoreColor(metrics.clientSatisfactionScore || 0)}
           subtext="Based on return rates"
         />
         

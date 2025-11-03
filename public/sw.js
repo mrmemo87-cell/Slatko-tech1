@@ -1,8 +1,8 @@
 // Slatko Confectionery Management - Service Worker
 // Provides offline functionality and caching for mobile usage
 
-const CACHE_NAME = 'slatko-v1.0.0';
-const API_CACHE_NAME = 'slatko-api-v1.0.0';
+const CACHE_NAME = 'slatko-v2.0.0';  // Updated version to force cache refresh
+const API_CACHE_NAME = 'slatko-api-v2.0.0';
 
 // Files to cache for offline use
 const STATIC_CACHE_URLS = [

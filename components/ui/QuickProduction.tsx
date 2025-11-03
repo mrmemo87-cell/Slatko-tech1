@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Product, Material, ProductionBatch } from '../../types';
 import { supabaseApi } from '../../services/supabase-api';
 import { generateId, todayISO } from '../../utils';
+import { PRODUCT_CATEGORIES, groupProductsByCategory } from '../../constants/productCategories';
 
 interface QuickProductionProps {
   t: any;
@@ -19,6 +20,7 @@ export const QuickProduction: React.FC<QuickProductionProps> = ({ t, showToast, 
   const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
   const [materialCheck, setMaterialCheck] = useState<{available: boolean, details: any[]}>({available: false, details: []});
   const [loading, setLoading] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -93,26 +95,71 @@ export const QuickProduction: React.FC<QuickProductionProps> = ({ t, showToast, 
   const ProductGrid = () => (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-center">Select Product</h3>
-      <div className="grid grid-cols-1 gap-3">
-        {products.map(product => (
-          <button
-            key={product.id}
-            onClick={() => setSelectedProduct(product)}
-            className={`p-4 border-2 rounded-lg text-left transition-colors ${
-              selectedProduct?.id === product.id
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 bg-white hover:border-blue-300'
-            }`}
-          >
-            <div className="font-medium text-gray-900">{product.name}</div>
-            <div className="text-sm text-gray-500">{product.unit}</div>
-            {product.recipe && (
-              <div className="text-xs text-gray-400 mt-1">
-                {product.recipe.length} ingredients
-              </div>
-            )}
-          </button>
-        ))}
+      <div className="space-y-3">
+        {Object.entries(groupProductsByCategory(products)).map(([categoryName, categoryProducts]) => {
+          const isExpanded = expandedCategories.has(categoryName);
+          const selectedInCategory = selectedProduct && categoryProducts.find(p => p.id === selectedProduct.id);
+          
+          return (
+            <div key={categoryName} className="bg-white border rounded-lg">
+              {/* Category Header */}
+              <button
+                onClick={() => {
+                  const newExpanded = new Set(expandedCategories);
+                  if (isExpanded) {
+                    newExpanded.delete(categoryName);
+                  } else {
+                    newExpanded.add(categoryName);
+                  }
+                  setExpandedCategories(newExpanded);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                  <h4 className="font-semibold text-gray-900">{categoryName}</h4>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                    {categoryProducts.length} products
+                  </span>
+                </div>
+                {selectedInCategory && (
+                  <span className="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full">
+                    Selected
+                  </span>
+                )}
+              </button>
+              
+              {/* Category Products */}
+              {isExpanded && (
+                <div className="border-t space-y-2 p-2">
+                  {categoryProducts.map(product => (
+                    <button
+                      key={product.id}
+                      onClick={() => setSelectedProduct(product)}
+                      className={`w-full p-3 border-2 rounded-lg text-left transition-colors ${
+                        selectedProduct?.id === product.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900">{product.name}</div>
+                      <div className="text-sm text-gray-500">{product.unit}</div>
+                      {product.recipe && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          {product.recipe.length} ingredients
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

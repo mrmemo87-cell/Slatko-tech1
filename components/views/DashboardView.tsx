@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { supabaseApi } from '../../services/supabase-api';
 import { formatCurrency } from '../../utils';
 import { Product, Client, Delivery } from '../../types';
+import { useProducts, useClients, useDeliveries, useProductionBatches } from '../../hooks/useDataQueries';
 
 interface DashboardViewProps {
   // FIX: Changed 't' prop type from TranslationFunction to 'any' to match the shape of the translation object.
@@ -18,44 +18,13 @@ const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title,
 );
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [production, setProduction] = useState<any[]>([]);
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [productsData, clientsData, productionData, deliveriesData] = await Promise.all([
-        supabaseApi.getProducts(),
-        supabaseApi.getClients(),
-        supabaseApi.getProductionBatches(),
-        supabaseApi.getDeliveries()
-      ]);
-      setProducts(productsData);
-      setClients(clientsData);
-      setProduction(productionData);
-      setDeliveries(deliveriesData);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading dashboard...</span>
-      </div>
-    );
-  }
+  // Use React Query hooks for data fetching
+  const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: production = [], isLoading: productionLoading } = useProductionBatches();
+  const { data: deliveries = [], isLoading: deliveriesLoading } = useDeliveries();
+  
+  const loading = productsLoading || clientsLoading || productionLoading || deliveriesLoading;
 
   const metrics = useMemo(() => {
     // Current Inventory
@@ -160,6 +129,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
   }, [deliveries, products, clients]);
   
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Loading dashboard...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
