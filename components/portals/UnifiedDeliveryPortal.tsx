@@ -246,43 +246,6 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       {/* Orders Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         
-        {/* All Orders Overview */}
-        {activeTab === 'all' && orders.allOrders.map((order) => (
-          <div key={order.id} className="bg-white p-4 rounded-lg border shadow-sm">
-            <UnifiedOrderCard
-              order={order}
-              showDetails="standard"
-              actions={getOrderActions(order)}
-            />
-            {/* Driver Assignment Info */}
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Driver Assignment:</span>
-                <span className={`text-sm font-medium ${
-                  order.assignedDriver 
-                    ? order.assignedDriver === currentUser.id 
-                      ? 'text-blue-600' 
-                      : 'text-purple-600'
-                    : 'text-gray-400'
-                }`}>
-                  {order.assignedDriver 
-                    ? order.assignedDriver === currentUser.id 
-                      ? '👤 You' 
-                      : `👥 ${order.assignedDriver}`
-                    : '⚪ Unassigned'
-                  }
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-sm text-gray-600">Status:</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${getStageColor(order.workflowStage)}`}>
-                  {getStageLabel(order.workflowStage)}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-
         {/* Ready for Pickup */}
         {activeTab === 'ready' && orders.readyForPickup.map((order) => (
           <UnifiedOrderCard
