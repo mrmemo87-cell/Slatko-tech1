@@ -71,6 +71,7 @@ export const translations: Translations = {
       deleteConfirm: 'Are you sure you want to delete this product?',
       saved: 'Product saved successfully.',
       deleted: 'Product deleted successfully.',
+      search: 'Search products...',
     },
     clients: {
       title: 'Manage Clients',
@@ -85,6 +86,7 @@ export const translations: Translations = {
       deleteConfirm: 'Are you sure you want to delete this client?',
       saved: 'Client saved successfully.',
       deleted: 'Client deleted successfully.',
+      search: 'Search clients...',
     },
     production: {
       title: 'Production Batches',
@@ -112,6 +114,13 @@ export const translations: Translations = {
     deliveries: {
       title: 'Deliveries & Settlements',
       newDelivery: 'New Delivery',
+      quickOrder: 'Quick Order',
+      selectClient: 'Select a client',
+      selectedClient: 'Selected Client',
+      addProducts: 'Add products',
+      confirmOrder: 'Confirm order',
+      cart: 'Cart',
+      createOrder: 'Create Order',
       invoice: 'Invoice',
       client: 'Client',
       date: 'Date',
@@ -167,6 +176,8 @@ export const translations: Translations = {
       search: 'Search...',
       noResults: 'No results found.',
       all: 'All',
+      back: 'Back',
+      creating: 'Creating...',
     },
   },
   ru: {
@@ -238,6 +249,7 @@ export const translations: Translations = {
       deleteConfirm: 'Вы уверены, что хотите удалить этот продукт?',
       saved: 'Продукт успешно сохранен.',
       deleted: 'Продукт успешно удален.',
+      search: 'Поиск продуктов...',
     },
     clients: {
       title: 'Управление клиентами',
@@ -252,6 +264,7 @@ export const translations: Translations = {
       deleteConfirm: 'Вы уверены, что хотите удалить этого клиента?',
       saved: 'Клиент успешно сохранен.',
       deleted: 'Клиент успешно удален.',
+      search: 'Поиск клиентов...',
     },
     production: {
       title: 'Партии производства',
@@ -279,6 +292,13 @@ export const translations: Translations = {
     deliveries: {
       title: 'Поставки и расчеты',
       newDelivery: 'Новая поставка',
+      quickOrder: 'Быстрый заказ',
+      selectClient: 'Выберите клиента',
+      selectedClient: 'Выбранный клиент',
+      addProducts: 'Добавьте продукты',
+      confirmOrder: 'Подтвердите заказ',
+      cart: 'Корзина',
+      createOrder: 'Создать заказ',
       invoice: 'Счет',
       client: 'Клиент',
       date: 'Дата',
@@ -334,6 +354,8 @@ export const translations: Translations = {
       search: 'Поиск...',
       noResults: 'Ничего не найдено.',
       all: 'Все',
+      back: 'Назад',
+      creating: 'Создание...',
     },
   },
 };
