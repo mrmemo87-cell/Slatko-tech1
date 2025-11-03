@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabaseApi } from '../../services/supabase-api';
 import { unifiedWorkflow } from '../../services/unifiedWorkflow';
 import { Client, Product } from '../../types';
+import { groupProductsByCategory } from '../../constants/productCategories';
 
 interface QuickOrderButtonProps {
   t: any;
@@ -18,6 +19,7 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +63,8 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
     setStep('products');
+    // Expand all categories by default for better UX
+    setExpandedCategories(new Set(Object.keys(groupProductsByCategory(products))));
   };
 
   const handleAddToCart = (product: Product) => {
@@ -129,6 +133,18 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const productsByCategory = groupProductsByCategory(filteredProducts);
+
+  const toggleCategory = (categoryName: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryName)) {
+      newExpanded.delete(categoryName);
+    } else {
+      newExpanded.add(categoryName);
+    }
+    setExpandedCategories(newExpanded);
+  };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
@@ -218,20 +234,52 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
                       />
 
-                      <div className="grid gap-2 max-h-64 overflow-y-auto">
-                        {filteredProducts.map(product => (
-                          <button
-                            key={product.id}
-                            onClick={() => handleAddToCart(product)}
-                            className="text-left p-3 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 flex justify-between items-center"
-                          >
-                            <div>
-                              <div className="font-semibold text-gray-900">{product.name}</div>
-                              <div className="text-sm text-gray-600">${product.price.toFixed(2)}</div>
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
+                          const isExpanded = expandedCategories.has(categoryName);
+                          
+                          return (
+                            <div key={categoryName} className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                              <button
+                                onClick={() => toggleCategory(categoryName)}
+                                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 transition-all duration-200"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <svg
+                                    className={`w-5 h-5 text-blue-600 transition-transform duration-200 ${isExpanded ? 'transform rotate-90' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                  <h3 className="font-bold text-gray-900">{categoryName}</h3>
+                                </div>
+                                <span className="px-3 py-1 bg-blue-600 text-white text-sm font-bold rounded-full">
+                                  {categoryProducts.length}
+                                </span>
+                              </button>
+                              
+                              {isExpanded && (
+                                <div className="p-2 space-y-2 bg-white">
+                                  {categoryProducts.map(product => (
+                                    <button
+                                      key={product.id}
+                                      onClick={() => handleAddToCart(product)}
+                                      className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 flex justify-between items-center"
+                                    >
+                                      <div>
+                                        <div className="font-semibold text-gray-900">{product.name}</div>
+                                        <div className="text-sm text-gray-600">${product.price.toFixed(2)}</div>
+                                      </div>
+                                      <div className="text-2xl text-green-600 font-bold">+</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="text-2xl">+</div>
-                          </button>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Cart */}
