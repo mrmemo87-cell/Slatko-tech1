@@ -90,6 +90,7 @@ export interface ProductionBatch {
 
 export interface DeliveryItem {
   productId: string;
+  productName?: string; // Product name for display
   quantity: number;
   price: number; // Price per unit for this specific delivery
 }
@@ -112,6 +113,7 @@ export interface Delivery {
   invoiceNumber: string;
   date: string; // ISO 8601 format
   clientId: string;
+  clientName?: string; // Client name for display
   items: DeliveryItem[];
   status: DeliveryStatus;
   returnDate?: string; // ISO 8601 format

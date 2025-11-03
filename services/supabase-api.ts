@@ -410,6 +410,7 @@ class SupabaseApiService {
         id: delivery.id,
         invoiceNumber: delivery.invoice_number,
         clientId: delivery.client_id,
+        clientName: delivery.clients?.business_name || delivery.clients?.name || 'Unknown Client',
         date: delivery.date,
         status: delivery.status,
         notes: delivery.notes || undefined,
@@ -421,6 +422,7 @@ class SupabaseApiService {
         actualDeliveryTime: delivery.actual_delivery_time,
         items: (itemsByDelivery[delivery.id] || []).map((item: any) => ({
           productId: item.product_id,
+          productName: item.products?.name || 'Unknown Product',
           quantity: item.quantity,
           price: item.price
         })),

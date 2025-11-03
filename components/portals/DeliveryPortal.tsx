@@ -67,6 +67,8 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
 
   const pickupOrder = async (orderId: string) => {
     try {
+      console.log('🚚 Picking up order:', orderId);
+      
       await workflowService.updateOrderWorkflowStage(
         orderId,
         'out_for_delivery',
@@ -75,10 +77,15 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
         `Order picked up by ${currentUser.name}`,
         { assignedDriver: currentUser.id, pickupTime: new Date().toISOString() }
       );
-      showToast('Order picked up successfully');
+      
+      showToast('✅ Order picked up! Moved to your route', 'success');
+      
+      // Refresh data to show updated workflow state
+      await loadDeliveryData();
+      
     } catch (error) {
-      console.error('Error picking up order:', error);
-      showToast('Error picking up order', 'error');
+      console.error('❌ Error picking up order:', error);
+      showToast(`Error picking up order: ${error.message || 'Unknown error'}`, 'error');
     }
   };
 
@@ -219,12 +226,21 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Client:</span>
-                <span className="font-medium">{order.clientId.slice(-6)}</span>
+                <span className="font-medium">{order.clientName || 'Loading...'}</span>
               </div>
               
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Items:</span>
-                <span className="font-medium">{order.items?.length || 0} products</span>
+              <div className="space-y-2">
+                <span className="text-gray-600 text-sm">Products:</span>
+                <div className="bg-gray-50 rounded p-3 space-y-1">
+                  {order.items && order.items.length > 0 ? order.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <span className="text-sm font-medium">{item.productName || 'Unknown Product'}</span>
+                      <span className="text-sm text-gray-600">{item.quantity} pcs</span>
+                    </div>
+                  )) : (
+                    <span className="text-sm text-gray-500">No items loaded</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-between text-sm">
