@@ -14,6 +14,10 @@ import { SlatkoIcon, DashboardIcon, ProductsIcon, ClientsIcon, ProductionIcon, D
 import { AlertCenter } from './components/ui/AlertCenter';
 import { BusinessMetricsDashboard } from './components/views/BusinessMetricsDashboard';
 import { MobileActionButton } from './components/ui/MobileActionButton';
+import { ProductionPortal } from './components/portals/ProductionPortal';
+import { DeliveryPortal } from './components/portals/DeliveryPortal';
+import { AdminPortal } from './components/portals/AdminPortal';
+import { User } from './types/workflow';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { LoginForm } from './components/auth/LoginForm';
 import { DataProvider } from './providers/DataProvider';
@@ -22,7 +26,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
 import { generateId } from './utils';
 
-type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'deliveries' | 'reports' | 'materials' | 'purchases' | 'business-intelligence' | 'import';
+type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'deliveries' | 'reports' | 'materials' | 'purchases' | 'business-intelligence' | 'import' | 'production-portal' | 'delivery-portal' | 'admin-portal';
 
 const AppContent: React.FC = () => {
   const { user, loading, signOut } = useAuth();
@@ -153,6 +157,12 @@ const AppContent: React.FC = () => {
         return <BusinessMetricsDashboard t={t} />;
       case 'import':
         return <BulkImport {...props} />;
+      case 'production-portal':
+        return <ProductionPortal currentUser={user as User} t={t} showToast={showToast} />;
+      case 'delivery-portal':
+        return <DeliveryPortal currentUser={user as User} t={t} showToast={showToast} />;
+      case 'admin-portal':
+        return <AdminPortal currentUser={user as User} t={t} showToast={showToast} />;
       default:
         return <DashboardView t={t} />;
     }
@@ -258,7 +268,19 @@ const AppContent: React.FC = () => {
             <MenuItem icon={<BusinessIntelligenceIcon />} label={t.navigation.businessIntelligence} id="business-intelligence" />
             <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
           </nav>
-          
+
+          {/* Workflow Portals Section */}
+          <div className="px-3 mt-6">
+            <div className={`text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 ${!isMenuOpen ? 'sr-only' : ''}`}>
+              Workflow Portals
+            </div>
+                        <nav className="space-y-1">
+              <MenuItem icon={<ProductionIcon />} label="🏭 Production Portal" id="production-portal" />
+              <MenuItem icon={<DeliveriesIcon />} label="🚚 Delivery Portal" id="delivery-portal" />
+              <MenuItem icon={<BusinessIntelligenceIcon />} label="👑 Admin Portal" id="admin-portal" />
+            </nav>
+          </div>
+
           {/* Bottom Settings Section */}
           <div className="border-t border-slate-200 dark:border-slate-700 p-2 space-y-1">
             {isMenuOpen && (

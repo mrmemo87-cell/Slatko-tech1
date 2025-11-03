@@ -118,6 +118,13 @@ export interface Delivery {
   returnedItems?: ReturnItem[];
   payments?: Payment[];
   notes?: string;
+  // Workflow extensions
+  workflowStage?: string;
+  assignedDriver?: string;
+  productionNotes?: string;
+  deliveryNotes?: string;
+  estimatedDeliveryTime?: string;
+  actualDeliveryTime?: string;
 }
 
 export interface InventoryDetail {
