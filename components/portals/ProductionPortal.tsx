@@ -41,10 +41,12 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
         loadProductionTasks()
       ]);
       
-      // Filter orders relevant to production
+      // Filter orders relevant to production - include 'order_placed' as these need production
       const productionOrders = deliveries.filter(order => 
-        ['production_queue', 'in_production', 'quality_check', 'ready_for_delivery'].includes(order.workflowStage || 'pending')
+        ['order_placed', 'production_queue', 'in_production', 'quality_check', 'ready_for_delivery'].includes(order.workflowStage || 'order_placed')
       );
+      
+      console.log('🏭 Production Portal: Loaded', productionOrders.length, 'orders for production');
       
       setOrders(productionOrders);
       setProductionTasks(tasks);
@@ -137,7 +139,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
             {orders.filter(o => o.workflowStage === 'in_production').length} In Production
           </span>
           <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
-            {orders.filter(o => o.workflowStage === 'production_queue').length} In Queue
+            {orders.filter(o => ['order_placed', 'production_queue'].includes(o.workflowStage || 'order_placed')).length} In Queue
           </span>
         </div>
       </div>
@@ -167,7 +169,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {orders
           .filter(order => {
-            if (activeTab === 'queue') return order.workflowStage === 'production_queue';
+            if (activeTab === 'queue') return ['order_placed', 'production_queue'].includes(order.workflowStage || 'order_placed');
             if (activeTab === 'in-progress') return order.workflowStage === 'in_production';
             if (activeTab === 'completed') return order.workflowStage === 'ready_for_delivery';
             return true;
@@ -238,7 +240,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
 
                 {/* Action Buttons */}
                 <div className="border-t pt-4 space-y-2">
-                  {order.workflowStage === 'production_queue' && (
+                  {(['order_placed', 'production_queue'].includes(order.workflowStage || 'order_placed')) && (
                     <button
                       onClick={() => startProduction(order.id)}
                       className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center"
@@ -279,7 +281,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
       </div>
 
       {orders.filter(order => {
-        if (activeTab === 'queue') return order.workflowStage === 'production_queue';
+        if (activeTab === 'queue') return ['order_placed', 'production_queue'].includes(order.workflowStage || 'order_placed');
         if (activeTab === 'in-progress') return order.workflowStage === 'in_production';
         if (activeTab === 'completed') return order.workflowStage === 'ready_for_delivery';
         return true;

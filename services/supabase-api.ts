@@ -413,6 +413,12 @@ class SupabaseApiService {
         date: delivery.date,
         status: delivery.status,
         notes: delivery.notes || undefined,
+        workflowStage: delivery.workflow_stage || 'order_placed',
+        assignedDriver: delivery.assigned_driver,
+        productionNotes: delivery.production_notes,
+        deliveryNotes: delivery.delivery_notes,
+        estimatedDeliveryTime: delivery.estimated_delivery_time,
+        actualDeliveryTime: delivery.actual_delivery_time,
         items: (itemsByDelivery[delivery.id] || []).map((item: any) => ({
           productId: item.product_id,
           quantity: item.quantity,
