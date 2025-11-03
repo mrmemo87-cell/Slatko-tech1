@@ -14,15 +14,16 @@ import { SlatkoIcon, DashboardIcon, ProductsIcon, ClientsIcon, ProductionIcon, D
 import { AlertCenter } from './components/ui/AlertCenter';
 import { BusinessMetricsDashboard } from './components/views/BusinessMetricsDashboard';
 import { MobileActionButton } from './components/ui/MobileActionButton';
-import { ProductionPortal } from './components/portals/ProductionPortal';
-import { DeliveryPortal } from './components/portals/DeliveryPortal';
-import { AdminPortal } from './components/portals/AdminPortal';
-import { OrderTracking } from './components/views/OrderTracking';
+import { UnifiedProductionPortal } from './components/portals/UnifiedProductionPortal';
+import { UnifiedDeliveryPortal } from './components/portals/UnifiedDeliveryPortal';
+import { UnifiedAdminPortal } from './components/views/UnifiedAdminPortal';
+import { UnifiedOrderTracking } from './components/views/UnifiedOrderTracking';
 import { User } from './types/workflow';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { LoginForm } from './components/auth/LoginForm';
 import { DataProvider } from './providers/DataProvider';
 import { translations } from './i18n/translations';
+import { subscribeToToasts, getCurrentToasts } from './utils/toast';
 import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
 import { generateId } from './utils';
@@ -38,6 +39,26 @@ const AppContent: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const t = useMemo(() => translations[lang], [lang]);
+
+  // Listen for global toasts from unified components
+  useEffect(() => {
+    const unsubscribe = subscribeToToasts((globalToasts) => {
+      setToasts(prev => {
+        // Merge global toasts with local ones, avoiding duplicates
+        const existingIds = new Set(prev.map(t => t.id));
+        const newToasts = globalToasts.filter(t => !existingIds.has(t.id));
+        return [...prev, ...newToasts];
+      });
+    });
+
+    // Initialize with existing global toasts
+    const existingGlobalToasts = getCurrentToasts();
+    if (existingGlobalToasts.length > 0) {
+      setToasts(prev => [...prev, ...existingGlobalToasts]);
+    }
+
+    return unsubscribe;
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -167,13 +188,13 @@ const AppContent: React.FC = () => {
       case 'import':
         return <BulkImport {...props} />;
       case 'order-tracking':
-        return <OrderTracking t={t} showToast={showToast} />;
+        return <UnifiedOrderTracking />;
       case 'production-portal':
-        return <ProductionPortal currentUser={user as User} t={t} showToast={showToast} />;
+        return <UnifiedProductionPortal />;
       case 'delivery-portal':
-        return <DeliveryPortal currentUser={user as User} t={t} showToast={showToast} />;
+        return <UnifiedDeliveryPortal />;
       case 'admin-portal':
-        return <AdminPortal currentUser={user as User} t={t} showToast={showToast} />;
+        return <UnifiedAdminPortal />;
       default:
         return <DashboardView t={t} />;
     }

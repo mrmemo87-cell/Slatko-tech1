@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
-import { showToast } from '../ui/Toast';
+import { showToast } from '../../utils/toast';
 
 export const UnifiedProductionPortal: React.FC = () => {
   const { user } = useAuth();

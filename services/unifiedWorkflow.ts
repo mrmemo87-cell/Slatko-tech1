@@ -99,6 +99,11 @@ export class UnifiedWorkflowService {
     return [...this.orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }
 
+  // Get all orders (for delivery portal overview)
+  getAllOrders(): WorkflowOrder[] {
+    return [...this.orders];
+  }
+
   // Get orders for production portal
   getProductionOrders(): {
     queue: WorkflowOrder[];

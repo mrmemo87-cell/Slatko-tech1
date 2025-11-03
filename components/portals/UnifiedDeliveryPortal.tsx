@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
-import { showToast } from '../ui/Toast';
+import { showToast } from '../../utils/toast';
 
 export const UnifiedDeliveryPortal: React.FC = () => {
   const { user } = useAuth();
@@ -10,9 +10,10 @@ export const UnifiedDeliveryPortal: React.FC = () => {
     readyForPickup: WorkflowOrder[];
     myRoute: WorkflowOrder[];
     completed: WorkflowOrder[];
-  }>({ readyForPickup: [], myRoute: [], completed: [] });
+    allOrders: WorkflowOrder[];
+  }>({ readyForPickup: [], myRoute: [], completed: [], allOrders: [] });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ready' | 'my-route' | 'completed'>('ready');
+  const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'my-route' | 'completed'>('all');
 
   const currentUser = {
     id: user?.id || 'unknown',
@@ -32,12 +33,20 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       setLoading(true);
       await unifiedWorkflow.loadOrders();
       const deliveryOrders = unifiedWorkflow.getDeliveryOrders(currentUser.id);
-      setOrders(deliveryOrders);
+      const allOrders = unifiedWorkflow.getAllOrders(); // Get all orders for overview
+      
+      setOrders({
+        ...deliveryOrders,
+        allOrders: allOrders.filter(order => 
+          ['ready_for_delivery', 'out_for_delivery', 'delivered', 'completed'].includes(order.workflowStage)
+        )
+      });
       
       console.log('🚚 Delivery Portal Data:', {
         readyForPickupCount: deliveryOrders.readyForPickup.length,
         myRouteCount: deliveryOrders.myRoute.length,
         completedCount: deliveryOrders.completed.length,
+        allOrdersCount: allOrders.length,
         currentUserId: currentUser.id
       });
       
@@ -116,12 +125,50 @@ export const UnifiedDeliveryPortal: React.FC = () => {
   };
 
   const getTabCounts = () => ({
+    all: orders.allOrders.length,
     ready: orders.readyForPickup.length,
     myRoute: orders.myRoute.length,
     completed: orders.completed.length
   });
 
   const counts = getTabCounts();
+
+  // Helper functions for All Orders view
+  const getStageColor = (stage: string): string => {
+    const colors = {
+      'placed': 'bg-blue-100 text-blue-800',
+      'production': 'bg-yellow-100 text-yellow-800',
+      'ready_for_delivery': 'bg-green-100 text-green-800',
+      'out_for_delivery': 'bg-purple-100 text-purple-800',
+      'delivered': 'bg-indigo-100 text-indigo-800',
+      'completed': 'bg-gray-100 text-gray-800'
+    };
+    return colors[stage] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStageLabel = (stage: string): string => {
+    const labels = {
+      'placed': 'Order Placed',
+      'production': 'In Production',
+      'ready_for_delivery': 'Ready for Pickup',
+      'out_for_delivery': 'Out for Delivery',
+      'delivered': 'Delivered',
+      'completed': 'Completed'
+    };
+    return labels[stage] || stage.replace('_', ' ').toUpperCase();
+  };
+
+  const canPickup = (order: WorkflowOrder): boolean => {
+    return order.workflowStage === 'ready_for_delivery' && !order.assignedDriver;
+  };
+
+  const canDeliver = (order: WorkflowOrder): boolean => {
+    return order.workflowStage === 'out_for_delivery' && order.assignedDriver === currentUser.id;
+  };
+
+  const canSettle = (order: WorkflowOrder): boolean => {
+    return order.workflowStage === 'delivered' && order.assignedDriver === currentUser.id;
+  };
 
   if (loading) {
     return (
@@ -154,6 +201,16 @@ export const UnifiedDeliveryPortal: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'all'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          🌍 All Orders ({counts.all})
+        </button>
         <button
           onClick={() => setActiveTab('ready')}
           className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
@@ -189,6 +246,43 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       {/* Orders Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         
+        {/* All Orders Overview */}
+        {activeTab === 'all' && orders.allOrders.map((order) => (
+          <div key={order.id} className="bg-white p-4 rounded-lg border shadow-sm">
+            <UnifiedOrderCard
+              order={order}
+              showDetails="standard"
+              actions={getOrderActions(order)}
+            />
+            {/* Driver Assignment Info */}
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Driver Assignment:</span>
+                <span className={`text-sm font-medium ${
+                  order.assignedDriver 
+                    ? order.assignedDriver === currentUser.id 
+                      ? 'text-blue-600' 
+                      : 'text-purple-600'
+                    : 'text-gray-400'
+                }`}>
+                  {order.assignedDriver 
+                    ? order.assignedDriver === currentUser.id 
+                      ? '👤 You' 
+                      : `👥 ${order.assignedDriver}`
+                    : '⚪ Unassigned'
+                  }
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-sm text-gray-600">Status:</span>
+                <span className={`text-xs px-2 py-1 rounded-full ${getStageColor(order.workflowStage)}`}>
+                  {getStageLabel(order.workflowStage)}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+
         {/* Ready for Pickup */}
         {activeTab === 'ready' && orders.readyForPickup.map((order) => (
           <UnifiedOrderCard
@@ -230,6 +324,96 @@ export const UnifiedDeliveryPortal: React.FC = () => {
           />
         ))}
 
+        {/* All Orders */}
+        {activeTab === 'all' && orders.allOrders.map((order) => (
+          <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            {/* Order Header */}
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="font-semibold text-gray-900">#{order.invoiceNumber}</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(order.workflowStage)}`}>
+                    {getStageLabel(order.workflowStage)}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600">{order.clientName}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">${order.total.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            {/* Driver Assignment */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Driver Assignment:</span>
+                <div className="text-right">
+                  {order.assignedDriver ? (
+                    <div>
+                      <p className="text-sm font-medium text-green-600">
+                        📱 {order.assignedDriver}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {order.assignedDriver === currentUser.id ? '(You)' : '(Other driver)'}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">🚚 Unassigned</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Order Items */}
+            <div className="mb-3">
+              <div className="text-sm text-gray-600">
+                {order.items.map((item, idx) => (
+                  <span key={idx}>
+                    {item.quantity}x {item.productName}
+                    {idx < order.items.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex space-x-2">
+              {canPickup(order) && (
+                <button
+                  onClick={() => pickupOrder(order.id)}
+                  className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  📦 Pick Up Order
+                </button>
+              )}
+              {canDeliver(order) && (
+                <button
+                  onClick={() => markDelivered(order.id)}
+                  className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  ✅ Mark Delivered
+                </button>
+              )}
+              {canSettle(order) && (
+                <button
+                  onClick={() => startSettlement(order.id)}
+                  className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-purple-700 transition-colors"
+                >
+                  💰 Start Settlement
+                </button>
+              )}
+              {!canPickup(order) && !canDeliver(order) && !canSettle(order) && (
+                <div className="flex-1 text-center py-2 text-sm text-gray-500">
+                  {order.assignedDriver && order.assignedDriver !== currentUser.id 
+                    ? '🔒 Assigned to another driver' 
+                    : '⏳ No actions available'}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
         {/* Completed */}
         {activeTab === 'completed' && orders.completed.map((order) => (
           <UnifiedOrderCard
@@ -242,6 +426,16 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       </div>
 
       {/* Empty States */}
+      {activeTab === 'all' && orders.allOrders.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📋</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+          <p className="text-gray-500">
+            All delivery orders across all stages will appear here with driver assignment details.
+          </p>
+        </div>
+      )}
+
       {activeTab === 'ready' && orders.readyForPickup.length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📦</div>
