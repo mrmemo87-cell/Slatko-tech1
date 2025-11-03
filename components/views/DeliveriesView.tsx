@@ -4,7 +4,6 @@ import { supabaseApi } from '../../services/supabase-api';
 import { Delivery, DeliveryItem, Client, Product, ReturnItem, Payment, DeliveryStatus } from '../../types';
 import { generateId, formatDate, formatCurrency, todayISO } from '../../utils';
 import { Modal } from '../ui/Modal';
-import { QuickSettlement } from '../ui/QuickSettlement';
 import { MobileDeliveryList } from '../ui/MobileDeliveryList';
 import { PlusIcon } from '../ui/Icons';
 
@@ -237,20 +236,8 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
         />
       )}
 
-      {isSettleModalOpen && settlingDelivery && (
-        <QuickSettlement
-            delivery={settlingDelivery}
-            t={t}
-            showToast={showToast}
-            onClose={() => {
-              setIsSettleModalOpen(false);
-              setSettlingDelivery(null);
-            }}
-            onUpdate={() => {
-              loadData();
-            }}
-        />
-      )}
+      {/* QuickSettlement removed - use UnifiedDeliveryPortal for settlement functionality */}
+      
       <style>{`
         .input-style {
           padding: 0.5rem 0.75rem;

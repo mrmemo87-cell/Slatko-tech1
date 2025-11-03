@@ -2,7 +2,6 @@
 // Single source of truth for all workflow operations across all portals
 
 import { supabaseApi } from './supabase-api';
-import { workflowService } from './workflowService';
 
 export interface WorkflowOrder {
   id: string;
@@ -66,11 +65,7 @@ export class UnifiedWorkflowService {
         })) || [],
         totalValue: delivery.items?.reduce((sum, item) => sum + (item.quantity * item.price), 0) || 0,
         estimatedDeliveryTime: delivery.estimatedDeliveryTime,
-        actualDeliveryTime: delivery.actualDeliveryTime,
-        productionStartTime: delivery.productionStartTime,
-        productionCompletedTime: delivery.productionCompletedTime,
-        deliveryStartTime: delivery.deliveryStartTime,
-        deliveryCompletedTime: delivery.deliveryCompletedTime,
+        actualDeliveryTime: delivery.actualDeliveryTime
       }));
 
       // Notify all listeners
@@ -144,15 +139,16 @@ export class UnifiedWorkflowService {
     metadata?: any
   ): Promise<void> {
     try {
-      // Use existing workflow service for the actual update
-      await workflowService.updateOrderWorkflowStage(
-        orderId,
-        newStage as any,
-        userId,
-        userRole as any,
-        notes,
-        metadata
-      );
+      // Update workflow stage directly via Supabase
+      const { error } = await supabaseApi.supabase
+        .from('deliveries')
+        .update({
+          workflow_stage: newStage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
 
       // Reload orders to get fresh data
       await this.loadOrders();

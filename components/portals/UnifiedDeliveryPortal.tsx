@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
-import { PaymentManager } from '../payment/PaymentManager';
+import { ClientFinancialReport } from '../payment/ClientFinancialReport';
 import { ClientPaymentSheetView } from '../payment/ClientPaymentSheetView';
 import { showToast } from '../../utils/toast';
 
@@ -527,13 +527,12 @@ export const UnifiedDeliveryPortal: React.FC = () => {
 
       {/* Payment Management Modals */}
       {showPaymentManager && selectedOrderForPayment && (
-        <PaymentManager
-          deliveryId={selectedOrderForPayment.id}
-          clientId={selectedOrderForPayment.client_id}
-          clientName={selectedOrderForPayment.client_name || 'Unknown Client'}
-          driverId={currentUser.id}
-          onPaymentComplete={handlePaymentComplete}
-          onCancel={() => {
+        <ClientFinancialReport
+          clientId={selectedOrderForPayment.clientId}
+          clientName={selectedOrderForPayment.clientName || 'Unknown Client'}
+          currentDeliveryId={selectedOrderForPayment.id}
+          onSettlementComplete={handlePaymentComplete}
+          onClose={() => {
             setShowPaymentManager(false);
             setSelectedOrderForPayment(null);
           }}

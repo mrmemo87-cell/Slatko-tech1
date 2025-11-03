@@ -123,19 +123,24 @@ ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_return_policy ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settlement_sessions ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
+-- RLS Policies (Drop existing ones first to avoid conflicts)
+DROP POLICY IF EXISTS "Authenticated users can access client account balance" ON public.client_account_balance;
 CREATE POLICY "Authenticated users can access client account balance" ON public.client_account_balance
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access order payment records" ON public.order_payment_records;
 CREATE POLICY "Authenticated users can access order payment records" ON public.order_payment_records
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access payment transactions" ON public.payment_transactions;
 CREATE POLICY "Authenticated users can access payment transactions" ON public.payment_transactions
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access client return policy" ON public.client_return_policy;
 CREATE POLICY "Authenticated users can access client return policy" ON public.client_return_policy
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access settlement sessions" ON public.settlement_sessions;
 CREATE POLICY "Authenticated users can access settlement sessions" ON public.settlement_sessions
   FOR ALL USING (auth.role() = 'authenticated');
 

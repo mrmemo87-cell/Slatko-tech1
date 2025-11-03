@@ -73,7 +73,7 @@ export const UnifiedOrderTracking: React.FC = () => {
     const stages = [...new Set(orders.map(order => order.workflowStage))];
     return stages.map(stage => ({
       value: stage,
-      label: unifiedWorkflow.getStageInfo(stage).label,
+      label: unifiedWorkflow.getStageInfo(stage as string).label,
       count: orders.filter(order => order.workflowStage === stage).length
     }));
   };
@@ -149,7 +149,7 @@ export const UnifiedOrderTracking: React.FC = () => {
       {/* Orders Statistics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
         {getStatusOptions().map(option => {
-          const stageInfo = unifiedWorkflow.getStageInfo(option.value);
+          const stageInfo = unifiedWorkflow.getStageInfo(option.value as string);
           return (
             <div
               key={option.value}

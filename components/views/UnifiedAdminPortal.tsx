@@ -74,12 +74,15 @@ export const UnifiedAdminPortal: React.FC = () => {
       return acc;
     }, {} as Record<string, { count: number; orders: WorkflowOrder[] }>);
 
-    return Object.entries(breakdown).map(([stage, data]) => ({
-      stage,
-      count: data.count,
-      orders: data.orders,
-      stageInfo: unifiedWorkflow.getStageInfo(stage)
-    }));
+    return Object.entries(breakdown).map(([stage, data]) => {
+      const typedData = data as { count: number; orders: WorkflowOrder[] };
+      return {
+        stage,
+        count: typedData.count,
+        orders: typedData.orders,
+        stageInfo: unifiedWorkflow.getStageInfo(stage)
+      };
+    });
   };
 
   const stats = getOverviewStats();

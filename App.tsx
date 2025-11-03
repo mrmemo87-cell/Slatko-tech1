@@ -13,12 +13,10 @@ import { BulkImport } from './components/views/BulkImport';
 import { SlatkoIcon, DashboardIcon, ProductsIcon, ClientsIcon, ProductionIcon, DeliveriesIcon, ReportsIcon, LanguageIcon, SunIcon, MoonIcon, InventoryIcon, MaterialsIcon, PurchasesIcon, BusinessIntelligenceIcon, LogoutIcon, ImportIcon } from './components/ui/Icons';
 import { AlertCenter } from './components/ui/AlertCenter';
 import { BusinessMetricsDashboard } from './components/views/BusinessMetricsDashboard';
-import { MobileActionButton } from './components/ui/MobileActionButton';
 import { UnifiedProductionPortal } from './components/portals/UnifiedProductionPortal';
 import { UnifiedDeliveryPortal } from './components/portals/UnifiedDeliveryPortal';
 import { UnifiedAdminPortal } from './components/views/UnifiedAdminPortal';
 import { UnifiedOrderTracking } from './components/views/UnifiedOrderTracking';
-import { User } from './types/workflow';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { LoginForm } from './components/auth/LoginForm';
 import { DataProvider } from './providers/DataProvider';
@@ -440,9 +438,6 @@ const AppContent: React.FC = () => {
             <AlertCenter t={t} />
           </div>
         </div>
-        
-        {/* Mobile Action Button */}
-        <MobileActionButton t={t} showToast={showToast} />
         
         {/* Mobile overlay */}
         {isMenuOpen && (

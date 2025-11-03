@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Delivery, Client, Product } from '../../types';
 import { formatDate, formatCurrency } from '../../utils';
-import { QuickSettlement } from './QuickSettlement';
 
 interface MobileDeliveryListProps {
   deliveries: Delivery[];
@@ -169,16 +168,7 @@ export const MobileDeliveryList: React.FC<MobileDeliveryListProps> = ({
         })
       )}
 
-      {/* Quick Settlement Modal */}
-      {selectedDelivery && (
-        <QuickSettlement
-          delivery={selectedDelivery}
-          t={t}
-          showToast={showToast}
-          onClose={() => setSelectedDelivery(null)}
-          onUpdate={onUpdate}
-        />
-      )}
+      {/* QuickSettlement removed - use UnifiedDeliveryPortal for settlement functionality */}
     </div>
   );
 };

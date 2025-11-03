@@ -1,4 +1,4 @@
-import { supabaseApi } from './supabase-api';
+import { supabase } from '../config/supabase';
 
 export interface ClientBalance {
   client_id: string;
@@ -116,7 +116,7 @@ class PaymentService {
 
   async getClientBalance(clientId: string): Promise<ClientBalance | null> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('client_account_balance')
         .select('*')
         .eq('client_id', clientId)
@@ -144,7 +144,7 @@ class PaymentService {
     // This is handled automatically by database triggers
     // But we can manually refresh if needed
     try {
-      await supabaseApi.supabase.rpc('update_client_balance_manual', { 
+      await supabase.rpc('update_client_balance_manual', { 
         client_id: clientId 
       });
     } catch (error) {
@@ -159,7 +159,7 @@ class PaymentService {
 
   async getOrderPaymentRecord(deliveryId: string): Promise<OrderPaymentRecord | null> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('order_payment_records')
         .select('*')
         .eq('delivery_id', deliveryId)
@@ -178,7 +178,7 @@ class PaymentService {
 
   async getClientUnpaidOrders(clientId: string): Promise<OrderPaymentRecord[]> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('order_payment_records')
         .select(`
           *,
@@ -225,7 +225,7 @@ class PaymentService {
       }
 
       // Update payment record
-      const { error: updateError } = await supabaseApi.supabase
+      const { error: updateError } = await supabase
         .from('order_payment_records')
         .update({
           amount_paid: newAmountPaid,
@@ -270,7 +270,7 @@ class PaymentService {
     recorded_by?: string;
   }): Promise<PaymentTransaction> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('payment_transactions')
         .insert({
           ...transaction,
@@ -290,7 +290,7 @@ class PaymentService {
 
   async getClientPaymentHistory(clientId: string, limit = 20): Promise<PaymentTransaction[]> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('payment_transactions')
         .select('*')
         .eq('client_id', clientId)
@@ -331,7 +331,7 @@ class PaymentService {
         settlement_date: new Date().toISOString().split('T')[0]
       };
 
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('settlement_sessions')
         .insert(settlementData)
         .select()
@@ -409,7 +409,7 @@ class PaymentService {
   async getClientPaymentSheet(clientId: string): Promise<ClientPaymentSheet | null> {
     try {
       // Get client info
-      const { data: clientData, error: clientError } = await supabaseApi.supabase
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('id, name, business_name')
         .eq('id', clientId)
@@ -443,7 +443,7 @@ class PaymentService {
 
   async getClientSettlementHistory(clientId: string, limit = 5): Promise<SettlementSession[]> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('settlement_sessions')
         .select('*')
         .eq('client_id', clientId)
@@ -460,7 +460,7 @@ class PaymentService {
 
   async getClientReturnPolicy(clientId: string) {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('client_return_policy')
         .select('*')
         .eq('client_id', clientId)
@@ -551,7 +551,7 @@ class PaymentService {
   }): Promise<OrderReturn> {
     try {
       // Create the return record
-      const { data: returnRecord, error: returnError } = await supabaseApi.supabase
+      const { data: returnRecord, error: returnError } = await supabase
         .from('order_returns')
         .insert({
           original_delivery_id: returnData.original_delivery_id,
@@ -577,7 +577,7 @@ class PaymentService {
         notes: item.notes
       }));
 
-      const { data: lineItems, error: itemsError } = await supabaseApi.supabase
+      const { data: lineItems, error: itemsError } = await supabase
         .from('return_line_items')
         .insert(returnItems)
         .select();
@@ -597,7 +597,7 @@ class PaymentService {
 
   async getOrderReturns(deliveryId: string): Promise<OrderReturn[]> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('order_returns')
         .select(`
           *,
@@ -620,7 +620,7 @@ class PaymentService {
 
   async getClientReturns(clientId: string, limit = 10): Promise<OrderReturn[]> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('order_returns')
         .select(`
           *,
@@ -645,7 +645,7 @@ class PaymentService {
 
   async getNetAmountDue(deliveryId: string): Promise<number> {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .rpc('get_net_amount_due', { p_delivery_id: deliveryId });
 
       if (error) throw error;
@@ -659,7 +659,7 @@ class PaymentService {
 
   async getOrderPaymentStatusWithReturns(deliveryId: string) {
     try {
-      const { data, error } = await supabaseApi.supabase
+      const { data, error } = await supabase
         .from('order_payment_status_with_returns')
         .select('*')
         .eq('delivery_id', deliveryId)

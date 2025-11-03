@@ -48,10 +48,12 @@ CREATE INDEX IF NOT EXISTS idx_return_line_items_return_id ON public.return_line
 ALTER TABLE public.order_returns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.return_line_items ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
+-- RLS Policies (Drop existing ones first to avoid conflicts)
+DROP POLICY IF EXISTS "Authenticated users can access order returns" ON public.order_returns;
 CREATE POLICY "Authenticated users can access order returns" ON public.order_returns
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access return line items" ON public.return_line_items;
 CREATE POLICY "Authenticated users can access return line items" ON public.return_line_items
   FOR ALL USING (auth.role() = 'authenticated');
 
