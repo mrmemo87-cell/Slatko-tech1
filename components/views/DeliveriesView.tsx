@@ -27,6 +27,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
   const [editingDelivery, setEditingDelivery] = useState<Delivery | null>(null);
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [settlingDelivery, setSettlingDelivery] = useState<Delivery | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -54,6 +55,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
   const [filter, setFilter] = useState<{ status: DeliveryStatus | 'All', client: string }>({ status: 'All', client: 'All' });
 
   const handleOpenNewModal = () => {
+    if (isCreating) return; // Prevent opening if already creating
     setEditingDelivery(null);
     setIsModalOpen(true);
   };
@@ -64,6 +66,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
   };
 
   const handleSave = async (deliveryData: Omit<Delivery, 'id' | 'invoiceNumber'>) => {
+    setIsCreating(true);
     try {
       if (editingDelivery) {
         // Update existing delivery - TODO: Implement updateDelivery in supabaseApi
@@ -74,11 +77,14 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
         await supabaseApi.createDelivery(deliveryData);
         await loadData(); // Reload all data
         showToast(t.deliveries.saved);
+        setIsModalOpen(false);
       }
-      setIsModalOpen(false);
     } catch (error) {
       console.error('Error saving delivery:', error);
       showToast('Error saving delivery', 'error');
+      throw error; // Re-throw to let the form handle it
+    } finally {
+      setIsCreating(false);
     }
   };  const handleSettleSave = async (settledDelivery: Delivery) => {
     try {
@@ -135,10 +141,27 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({ t, showToast }) 
         <h1 className="text-3xl font-bold text-slate-800 dark:text-white">{t.deliveries.title}</h1>
         <button
           onClick={handleOpenNewModal}
-          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          className={`flex items-center px-4 py-2 rounded-lg font-semibold transition-colors ${
+            isCreating 
+              ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+          disabled={isCreating}
         >
-          <PlusIcon className="mr-2" />
-          {t.deliveries.newDelivery}
+          {isCreating ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Creating...
+            </>
+          ) : (
+            <>
+              <PlusIcon className="mr-2" />
+              {t.deliveries.newDelivery}
+            </>
+          )}
         </button>
       </div>
 
@@ -266,6 +289,7 @@ const DeliveryFormModal: React.FC<DeliveryFormModalProps> = ({ isOpen, onClose, 
     const [notes, setNotes] = useState('');
     const [inventory, setInventory] = useState<Record<string, number>>({});
     const [errors, setErrors] = useState<Record<number, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
     useEffect(() => {
         if (isOpen) {
@@ -274,6 +298,7 @@ const DeliveryFormModal: React.FC<DeliveryFormModalProps> = ({ isOpen, onClose, 
             setItems([]);
             setNotes('');
             setErrors({});
+            setIsSubmitting(false);
             // TODO: Calculate inventory from Supabase data
             console.warn('Inventory calculation not implemented yet');
         }
@@ -326,24 +351,29 @@ const DeliveryFormModal: React.FC<DeliveryFormModalProps> = ({ isOpen, onClose, 
 
     const hasErrors = Object.keys(errors).length > 0;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (hasErrors) {
-          showToast(t.deliveries.form_errors, 'error');
+        if (hasErrors || isSubmitting) {
+          if (hasErrors) showToast(t.deliveries.form_errors, 'error');
           return;
         }
         if(!clientId || items.length === 0) return;
         const finalItems = items.filter(i => i.quantity > 0 && i.price >= 0);
         if(finalItems.length === 0) return;
 
-        onSave({
-            invoiceNumber: '', // will be generated on save
-            date: new Date(date).toISOString(),
-            clientId,
-            items: finalItems,
-            status: 'Pending',
-            notes,
-        });
+        setIsSubmitting(true);
+        try {
+            await onSave({
+                invoiceNumber: '', // will be generated on save
+                date: new Date(date).toISOString(),
+                clientId,
+                items: finalItems,
+                status: 'Pending',
+                notes,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     }
     
     return (
@@ -394,8 +424,31 @@ const DeliveryFormModal: React.FC<DeliveryFormModalProps> = ({ isOpen, onClose, 
                 <button type="button" onClick={handleAddItem} className="text-blue-600 font-medium text-sm">{t.common.add} {t.deliveries.items.toLowerCase()}</button>
 
                 <div className="flex justify-end pt-4 space-x-2">
-                    <button type="button" onClick={onClose} className="btn-secondary">{t.common.cancel}</button>
-                    <button type="submit" className={`btn-primary ${hasErrors ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={hasErrors}>{t.common.save}</button>
+                    <button 
+                        type="button" 
+                        onClick={onClose} 
+                        className="btn-secondary"
+                        disabled={isSubmitting}
+                    >
+                        {t.common.cancel}
+                    </button>
+                    <button 
+                        type="submit" 
+                        className={`btn-primary ${(hasErrors || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                        disabled={hasErrors || isSubmitting}
+                    >
+                        {isSubmitting ? (
+                            <div className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Saving...
+                            </div>
+                        ) : (
+                            t.common.save
+                        )}
+                    </button>
                 </div>
             </form>
             <style>{`
