@@ -410,20 +410,23 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
         // 🚀 AUTOMATICALLY ADD TO WORKFLOW TRACKING SYSTEM
         if (newDelivery && newDelivery.id) {
           try {
+            // Update the delivery with workflow stage in the database
             await workflowService.updateOrderWorkflowStage(
               newDelivery.id,
               'order_placed',
-              'quick_order_system',
+              'system',
               'sales',
-              `Order placed via Quick Order system for ${selectedClient.name} - Total: ${formatCurrency(total)}`
+              `Order placed via Quick Order for ${selectedClient.name} - Total: ${formatCurrency(total)}`
             );
             
-            showToast(`✅ Order created and tracked! ${selectedClient.name} - ${formatCurrency(total)}. Check Order Tracking to monitor progress.`);
+            console.log('✅ Order added to workflow tracking:', newDelivery.id);
+            showToast(`✅ Order created and tracked! ${selectedClient.name} - ${formatCurrency(total)}. Check "Order Tracking" to monitor progress.`);
           } catch (workflowError) {
-            console.warn('Order created but workflow tracking failed:', workflowError);
-            showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`, 'success');
+            console.warn('⚠️ Order created but workflow tracking failed:', workflowError);
+            showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)} (Tracking may be delayed)`, 'success');
           }
         } else {
+          console.error('❌ No delivery ID returned from createDelivery');
           showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`, 'success');
         }
         

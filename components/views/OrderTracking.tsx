@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EnhancedDelivery, WorkflowStage } from '../../types/workflow';
 import { workflowService } from '../../services/workflowService';
 import { formatCurrency, formatDate } from '../../utils';
+import { supabaseApi } from '../../services/supabase-api';
 
 interface OrderTrackingProps {
   t: any;
@@ -19,7 +20,7 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ t, showToast }) =>
     
     // Subscribe to real-time updates
     const unsubscribe = workflowService.subscribeToWorkflowUpdates(
-      'tracking',
+      'admin',
       handleOrderUpdate
     );
 
@@ -41,9 +42,25 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ t, showToast }) =>
   };
 
   const fetchOrdersFromAPI = async (): Promise<EnhancedDelivery[]> => {
-    // Mock implementation - replace with actual API call
-    // This should fetch all orders from your database
-    return [];
+    try {
+      // Fetch all deliveries using supabaseApi
+      const deliveries = await supabaseApi.getDeliveries();
+
+      // Convert deliveries to EnhancedDelivery format
+      const enhancedDeliveries: EnhancedDelivery[] = deliveries.map(delivery => ({
+        ...delivery,
+        workflowStage: (delivery.workflowStage as WorkflowStage) || 'order_placed',
+        statusHistory: [],
+        realTimeUpdates: true
+      }));
+
+      console.log('📋 Order Tracking: Loaded', enhancedDeliveries.length, 'orders');
+      return enhancedDeliveries;
+    } catch (error) {
+      console.error('❌ Error fetching orders for tracking:', error);
+      showToast('Error loading orders', 'error');
+      return [];
+    }
   };
 
   const handleOrderUpdate = (update: any) => {
@@ -158,11 +175,27 @@ export const OrderTracking: React.FC<OrderTrackingProps> = ({ t, showToast }) =>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">
               {filterStage === 'all' ? 'No Orders Found' : `No Orders in ${getStageName(filterStage)}`}
             </h3>
-            <p className="text-gray-500">
+            <p className="text-gray-500 mb-4">
               {filterStage === 'all' 
                 ? 'Orders placed through Quick Order will appear here automatically.' 
                 : 'Try selecting a different stage or create a new order.'}
             </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left max-w-md mx-auto">
+              <h4 className="font-semibold text-blue-800 mb-2">🔍 Debug Info:</h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <div>Total orders loaded: {orders.length}</div>
+                <div>Filter stage: {filterStage}</div>
+                <div>Filtered orders: {filteredOrders.length}</div>
+                {orders.length > 0 && (
+                  <div className="mt-2 text-xs">
+                    <strong>Sample order stages:</strong>
+                    {orders.slice(0, 3).map((order, i) => (
+                      <div key={i}>#{order.invoiceNumber}: {order.workflowStage || 'none'}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           filteredOrders.map((order) => (
