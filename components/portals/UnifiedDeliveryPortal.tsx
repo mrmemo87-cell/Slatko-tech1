@@ -302,7 +302,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 <p className="text-sm text-gray-600">{order.clientName}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">${order.total.toFixed(2)}</p>
+                <p className="text-sm font-medium text-gray-900">${(order.totalValue || 0).toFixed(2)}</p>
                 <p className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</p>
               </div>
             </div>
