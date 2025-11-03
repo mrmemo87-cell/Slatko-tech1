@@ -481,6 +481,20 @@ class SupabaseApiService {
         await this.updateProductStock(item.productId, item.quantity, 'subtract');
       }
 
+      // Update client's lastOrderDate and order statistics
+      const { error: clientUpdateError } = await supabase
+        .from(TABLES.CLIENTS)
+        .update({
+          last_order_date: deliveryData.date,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', deliveryData.clientId);
+
+      if (clientUpdateError) {
+        console.error('Error updating client lastOrderDate:', clientUpdateError);
+        // Don't throw error as delivery was successful, just log the warning
+      }
+
       // Return full delivery object
       const deliveries = await this.getDeliveries(1);
       return deliveries.find(d => d.id === delivery.id)!;

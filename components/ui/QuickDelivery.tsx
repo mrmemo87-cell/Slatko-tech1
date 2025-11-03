@@ -21,6 +21,7 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
   const [step, setStep] = useState<'client' | 'products' | 'review'>('client');
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
 
   useEffect(() => {
     loadData();
@@ -33,7 +34,10 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
         supabaseApi.getClients(),
         supabaseApi.getProducts()
       ]);
-      setClients(clientsData);
+      
+      // Sort clients by order priority (expected to order soon first)
+      const sortedClients = sortClientsByOrderPriority(clientsData);
+      setClients(sortedClients);
       setProducts(productsData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -43,28 +47,205 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
     }
   };
 
+  // Sort clients based on last order date - prioritize those expected to order
+  const sortClientsByOrderPriority = (clientList: Client[]): Client[] => {
+    const now = new Date();
+    
+    return clientList.sort((a, b) => {
+      // Parse dates safely
+      const aLastOrder = a.lastOrderDate ? new Date(a.lastOrderDate) : null;
+      const bLastOrder = b.lastOrderDate ? new Date(b.lastOrderDate) : null;
+      
+      // Handle invalid dates
+      const aValid = aLastOrder && !isNaN(aLastOrder.getTime());
+      const bValid = bLastOrder && !isNaN(bLastOrder.getTime());
+      
+      // New clients (no valid date) get highest priority
+      if (!aValid && !bValid) return a.name.localeCompare(b.name); // Sort by name as tiebreaker
+      if (!aValid) return -1; // a comes first (new client)
+      if (!bValid) return 1;  // b comes first (new client)
+      
+      // Calculate days since last order for valid dates
+      const aDaysSince = Math.floor((now.getTime() - aLastOrder!.getTime()) / (1000 * 60 * 60 * 24));
+      const bDaysSince = Math.floor((now.getTime() - bLastOrder!.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Sort by days since last order (more days = higher priority to order again)
+      const daysDiff = bDaysSince - aDaysSince;
+      
+      // If same number of days, sort by name
+      return daysDiff !== 0 ? daysDiff : a.name.localeCompare(b.name);
+    });
+  };
+
+  // Get order priority indicator for display
+  const getOrderPriorityInfo = (client: Client): { priority: 'high' | 'medium' | 'low', text: string, days: number } => {
+    if (!client.lastOrderDate) {
+      return { priority: 'high', text: 'New client', days: 0 };
+    }
+    
+    const now = new Date();
+    const lastOrder = new Date(client.lastOrderDate);
+    
+    // Handle invalid dates
+    if (isNaN(lastOrder.getTime())) {
+      return { priority: 'high', text: 'New client', days: 0 };
+    }
+    
+    const daysSince = Math.floor((now.getTime() - lastOrder.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Handle negative days (future dates)
+    if (daysSince < 0) {
+      return { priority: 'low', text: 'Today', days: 0 };
+    }
+    
+    // High priority: Haven't ordered in a week or more
+    if (daysSince >= 7) {
+      if (daysSince >= 30) {
+        const months = Math.floor(daysSince / 30);
+        return { priority: 'high', text: `${months} month${months === 1 ? '' : 's'} ago`, days: daysSince };
+      } else if (daysSince >= 14) {
+        const weeks = Math.floor(daysSince / 7);
+        return { priority: 'high', text: `${weeks} week${weeks === 1 ? '' : 's'} ago`, days: daysSince };
+      } else {
+        return { priority: 'high', text: `${daysSince} days ago`, days: daysSince };
+      }
+    } 
+    // Medium priority: 3-6 days ago  
+    else if (daysSince >= 3) {
+      return { priority: 'medium', text: `${daysSince} days ago`, days: daysSince };
+    } 
+    // Low priority: Recent orders (0-2 days)
+    else {
+      return { 
+        priority: 'low', 
+        text: daysSince === 0 ? 'Today' : `${daysSince} day${daysSince === 1 ? '' : 's'} ago`, 
+        days: daysSince 
+      };
+    }
+  };
+
   // Quick client selection with large touch targets
-  const ClientSelector = () => (
-    <div className="space-y-3">
-      <h3 className="text-lg font-semibold mb-4 text-center">Select Client</h3>
-      <div className="space-y-2">
-        {clients.map(client => (
-          <button
-            key={client.id}
-            onClick={() => {
-              setSelectedClient(client);
-              setStep('products');
-            }}
-            className="w-full p-4 bg-white border-2 border-gray-200 rounded-lg text-left hover:border-blue-500 hover:bg-blue-50 transition-colors"
-          >
-            <div className="font-medium text-gray-900">{client.name}</div>
-            <div className="text-sm text-gray-500">{client.businessName}</div>
-            <div className="text-xs text-gray-400">{client.phone}</div>
-          </button>
-        ))}
+  const ClientSelector = () => {
+    // Filter clients based on search term
+    const filteredClients = clients.filter(client => 
+      client.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      client.businessName?.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
+      client.phone?.includes(clientSearchTerm)
+    );
+
+    return (
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold mb-4 text-center">Select Client</h3>
+        
+        {/* Search input */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search clients..."
+            value={clientSearchTerm}
+            onChange={(e) => setClientSearchTerm(e.target.value)}
+            className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+          />
+          {clientSearchTerm && (
+            <button
+              onClick={() => setClientSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        
+        <div className="text-xs text-center text-gray-500 mb-4">
+          Sorted by order priority - Expected to order clients first
+          {clientSearchTerm && ` (${filteredClients.length} matches)`}
+        </div>
+        
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {filteredClients.map(client => {
+          const priorityInfo = getOrderPriorityInfo(client);
+          const priorityColors = {
+            high: 'bg-red-100 text-red-700 border-red-200',
+            medium: 'bg-yellow-100 text-yellow-700 border-yellow-200', 
+            low: 'bg-green-100 text-green-700 border-green-200'
+          };
+          
+          return (
+            <button
+              key={client.id}
+              onClick={() => {
+                setSelectedClient(client);
+                setStep('products');
+              }}
+              className={`w-full p-4 bg-white border-2 rounded-lg text-left hover:border-blue-500 hover:bg-blue-50 transition-colors ${
+                priorityInfo.priority === 'high' ? 'border-red-200' : 
+                priorityInfo.priority === 'medium' ? 'border-yellow-200' : 
+                'border-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{client.name}</div>
+                  <div className="text-sm text-gray-500">{client.businessName}</div>
+                  <div className="text-xs text-gray-400">{client.phone}</div>
+                  {client.lastOrderDate && (
+                    <div className="text-xs text-blue-600 mt-1 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-medium">Last order:</span>
+                      <span className="ml-1">
+                        {new Date(client.lastOrderDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          timeZone: 'Asia/Bishkek'
+                        })}
+                      </span>
+                      <span className="mx-1">•</span>
+                      <span className="font-mono">
+                        {new Date(client.lastOrderDate).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                          timeZone: 'Asia/Bishkek'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {!client.lastOrderDate && (
+                    <div className="text-xs text-orange-600 mt-1 font-medium flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      No previous orders
+                    </div>
+                  )}
+                </div>
+                <div className="ml-3 flex flex-col items-end">
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full border ${priorityColors[priorityInfo.priority]}`}>
+                    {priorityInfo.priority === 'high' ? '🔥 Expected' : 
+                     priorityInfo.priority === 'medium' ? '⚡ Soon' : 
+                     '✅ Recent'}
+                  </span>
+                  <span className="text-xs text-gray-400 mt-1">
+                    {priorityInfo.text}
+                  </span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+        </div>
+        
+        {filteredClients.length === 0 && clientSearchTerm && (
+          <div className="text-center py-8 text-gray-500">
+            No clients found matching "{clientSearchTerm}"
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // Product selection with quantity buttons
   const ProductSelector = () => {
@@ -224,6 +405,10 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
         });
         
         showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`);
+        
+        // Refresh client data to get updated lastOrderDate
+        await loadData();
+        
         onClose();
       } catch (error) {
         console.error('Error creating delivery:', error);
