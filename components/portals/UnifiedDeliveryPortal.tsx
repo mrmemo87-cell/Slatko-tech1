@@ -45,10 +45,10 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       });
       
       console.log('🚚 Delivery Portal Data:', {
-        readyForPickupCount: deliveryOrders.readyForPickup.length,
-        myRouteCount: deliveryOrders.myRoute.length,
-        completedCount: deliveryOrders.completed.length,
-        allOrdersCount: allOrders.length,
+        readyForPickupCount: (deliveryOrders?.readyForPickup || []).length,
+        myRouteCount: (deliveryOrders?.myRoute || []).length,
+        completedCount: (deliveryOrders?.completed || []).length,
+        allOrdersCount: (allOrders || []).length,
         currentUserId: currentUser.id
       });
       
@@ -104,6 +104,9 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         { assignedDriver: currentUser.id, pickupTime: new Date().toISOString() }
       );
       
+      // Reload data after pickup
+      await loadDeliveryData();
+      
       showToast('✅ Order picked up! Added to your route', 'success');
       
     } catch (error) {
@@ -129,6 +132,9 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         `Order delivered by ${currentUser.name || 'Driver'}`
       );
       
+      // Reload data after marking delivered
+      await loadDeliveryData();
+      
       showToast('✅ Order marked as delivered!', 'success');
       
     } catch (error) {
@@ -152,6 +158,9 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         'delivery',
         `Settlement started by ${currentUser.name || 'Driver'}`
       );
+      
+      // Reload data after settlement
+      await loadDeliveryData();
       
       showToast('💰 Settlement process started', 'success');
       
@@ -426,7 +435,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       </div>
 
       {/* Empty States */}
-      {activeTab === 'all' && orders.allOrders.length === 0 && (
+      {activeTab === 'all' && (orders.allOrders || []).length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📋</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
@@ -436,7 +445,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'ready' && orders.readyForPickup.length === 0 && (
+      {activeTab === 'ready' && (orders.readyForPickup || []).length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📦</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No orders ready for pickup</h3>
@@ -446,7 +455,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'my-route' && orders.myRoute.length === 0 && (
+      {activeTab === 'my-route' && (orders.myRoute || []).length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🚚</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No orders in your route</h3>
@@ -456,7 +465,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'completed' && orders.completed.length === 0 && (
+      {activeTab === 'completed' && (orders.completed || []).length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">✅</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No completed deliveries</h3>
