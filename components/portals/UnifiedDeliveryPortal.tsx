@@ -33,12 +33,14 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       setLoading(true);
       await unifiedWorkflow.loadOrders();
       const deliveryOrders = unifiedWorkflow.getDeliveryOrders(currentUser.id);
-      const allOrders = unifiedWorkflow.getAllOrders(); // Get all orders for overview
+      const allOrders = unifiedWorkflow.getAllOrders() || []; // Get all orders for overview
       
       setOrders({
-        ...deliveryOrders,
+        readyForPickup: deliveryOrders?.readyForPickup || [],
+        myRoute: deliveryOrders?.myRoute || [],
+        completed: deliveryOrders?.completed || [],
         allOrders: allOrders.filter(order => 
-          ['ready_for_delivery', 'out_for_delivery', 'delivered', 'completed'].includes(order.workflowStage)
+          order && ['ready_for_delivery', 'out_for_delivery', 'delivered', 'completed'].includes(order.workflowStage)
         )
       });
       
@@ -59,20 +61,46 @@ export const UnifiedDeliveryPortal: React.FC = () => {
   };
 
   const handleWorkflowUpdate = (allOrders: WorkflowOrder[]) => {
-    const deliveryOrders = unifiedWorkflow.getDeliveryOrders(currentUser.id);
-    setOrders(deliveryOrders);
+    try {
+      const deliveryOrders = unifiedWorkflow.getDeliveryOrders(currentUser.id);
+      const allOrdersFiltered = (allOrders || []).filter(order => 
+        order && ['ready_for_delivery', 'out_for_delivery', 'delivered', 'completed'].includes(order.workflowStage)
+      );
+      
+      setOrders({
+        readyForPickup: deliveryOrders?.readyForPickup || [],
+        myRoute: deliveryOrders?.myRoute || [],
+        completed: deliveryOrders?.completed || [],
+        allOrders: allOrdersFiltered
+      });
+    } catch (error) {
+      console.error('❌ Error updating workflow:', error);
+    }
   };
 
   const pickupOrder = async (orderId: string) => {
     try {
       console.log('🚚 Picking up order:', orderId);
+      console.log('👤 Current user:', currentUser);
+      console.log('📦 Update parameters:', {
+        orderId,
+        newStage: 'out_for_delivery',
+        userId: currentUser?.id,
+        userRole: 'delivery',
+        notes: `Order picked up by ${currentUser?.name || 'Unknown'}`,
+        metadata: { assignedDriver: currentUser?.id, pickupTime: new Date().toISOString() }
+      });
+      
+      if (!currentUser?.id) {
+        throw new Error('Current user ID is missing');
+      }
       
       await unifiedWorkflow.updateOrderStage(
         orderId,
         'out_for_delivery',
         currentUser.id,
         'delivery',
-        `Order picked up by ${currentUser.name}`,
+        `Order picked up by ${currentUser.name || 'Driver'}`,
         { assignedDriver: currentUser.id, pickupTime: new Date().toISOString() }
       );
       
@@ -80,7 +108,8 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Error picking up order:', error);
-      showToast(`Error picking up order: ${error.message || 'Unknown error'}`, 'error');
+      console.error('❌ Full error details:', JSON.stringify(error, null, 2));
+      showToast(`Error picking up order: ${error.message || error.error?.message || 'Unknown error'}`, 'error');
     }
   };
 
@@ -88,12 +117,16 @@ export const UnifiedDeliveryPortal: React.FC = () => {
     try {
       console.log('📦 Marking order as delivered:', orderId);
       
+      if (!currentUser?.id) {
+        throw new Error('Current user ID is missing');
+      }
+      
       await unifiedWorkflow.updateOrderStage(
         orderId,
         'delivered',
         currentUser.id,
         'delivery',
-        `Order delivered by ${currentUser.name}`
+        `Order delivered by ${currentUser.name || 'Driver'}`
       );
       
       showToast('✅ Order marked as delivered!', 'success');
@@ -108,12 +141,16 @@ export const UnifiedDeliveryPortal: React.FC = () => {
     try {
       console.log('💰 Starting settlement for order:', orderId);
       
+      if (!currentUser?.id) {
+        throw new Error('Current user ID is missing');
+      }
+      
       await unifiedWorkflow.updateOrderStage(
         orderId,
         'settlement',
         currentUser.id,
         'delivery',
-        `Settlement started by ${currentUser.name}`
+        `Settlement started by ${currentUser.name || 'Driver'}`
       );
       
       showToast('💰 Settlement process started', 'success');
@@ -125,10 +162,10 @@ export const UnifiedDeliveryPortal: React.FC = () => {
   };
 
   const getTabCounts = () => ({
-    all: orders.allOrders.length,
-    ready: orders.readyForPickup.length,
-    myRoute: orders.myRoute.length,
-    completed: orders.completed.length
+    all: (orders.allOrders || []).length,
+    ready: (orders.readyForPickup || []).length,
+    myRoute: (orders.myRoute || []).length,
+    completed: (orders.completed || []).length
   });
 
   const counts = getTabCounts();
@@ -247,7 +284,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         
         {/* Ready for Pickup */}
-        {activeTab === 'ready' && orders.readyForPickup.map((order) => (
+        {activeTab === 'ready' && (orders.readyForPickup || []).map((order) => (
           <UnifiedOrderCard
             key={order.id}
             order={order}
@@ -264,7 +301,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         ))}
 
         {/* My Route */}
-        {activeTab === 'my-route' && orders.myRoute.map((order) => (
+        {activeTab === 'my-route' && (orders.myRoute || []).map((order) => (
           <UnifiedOrderCard
             key={order.id}
             order={order}
@@ -288,7 +325,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         ))}
 
         {/* All Orders */}
-        {activeTab === 'all' && orders.allOrders.map((order) => (
+        {activeTab === 'all' && (orders.allOrders || []).map((order) => (
           <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
             {/* Order Header */}
             <div className="flex justify-between items-start mb-3">
@@ -331,10 +368,10 @@ export const UnifiedDeliveryPortal: React.FC = () => {
             {/* Order Items */}
             <div className="mb-3">
               <div className="text-sm text-gray-600">
-                {order.items.map((item, idx) => (
+                {(order.items || []).map((item, idx) => (
                   <span key={idx}>
                     {item.quantity}x {item.productName}
-                    {idx < order.items.length - 1 ? ', ' : ''}
+                    {idx < (order.items || []).length - 1 ? ', ' : ''}
                   </span>
                 ))}
               </div>
@@ -378,7 +415,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         ))}
 
         {/* Completed */}
-        {activeTab === 'completed' && orders.completed.map((order) => (
+        {activeTab === 'completed' && (orders.completed || []).map((order) => (
           <UnifiedOrderCard
             key={order.id}
             order={order}
