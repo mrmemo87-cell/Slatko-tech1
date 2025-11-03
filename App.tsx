@@ -12,7 +12,7 @@ import { PurchasesView } from './components/views/PurchasesView';
 import { BulkImport } from './components/views/BulkImport';
 import { SlatkoIcon, DashboardIcon, ProductsIcon, ClientsIcon, ProductionIcon, DeliveriesIcon, ReportsIcon, LanguageIcon, SunIcon, MoonIcon, InventoryIcon, MaterialsIcon, PurchasesIcon, BusinessIntelligenceIcon, LogoutIcon, ImportIcon } from './components/ui/Icons';
 import { AlertCenter } from './components/ui/AlertCenter';
-import { BusinessMetricsDashboard } from './components/views/BusinessMetricsDashboard';
+import { QuickOrderButton } from './components/ui/QuickOrderButton';
 import { UnifiedProductionPortal } from './components/portals/UnifiedProductionPortal';
 import { UnifiedDeliveryPortal } from './components/portals/UnifiedDeliveryPortal';
 import { UnifiedAdminPortal } from './components/views/UnifiedAdminPortal';
@@ -26,7 +26,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
 import { generateId } from './utils';
 
-type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'deliveries' | 'reports' | 'materials' | 'purchases' | 'business-intelligence' | 'import' | 'order-tracking' | 'production-portal' | 'delivery-portal' | 'admin-portal';
+type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'reports' | 'materials' | 'purchases' | 'import' | 'production-portal' | 'delivery-portal' | 'admin-portal';
 
 const AppContent: React.FC = () => {
   const { user, loading, signOut } = useAuth();
@@ -173,20 +173,14 @@ const AppContent: React.FC = () => {
         return <ProductionView {...props} />;
       case 'inventory':
         return <InventoryView t={t} />;
-      case 'deliveries':
-        return <DeliveriesView {...props} />;
       case 'products':
         return <ProductsView {...props} />;
       case 'clients':
         return <ClientsView {...props} />;
       case 'reports':
         return <ReportsView t={t} />;
-      case 'business-intelligence':
-        return <BusinessMetricsDashboard t={t} />;
       case 'import':
         return <BulkImport {...props} />;
-      case 'order-tracking':
-        return <UnifiedOrderTracking />;
       case 'production-portal':
         return <UnifiedProductionPortal />;
       case 'delivery-portal':
@@ -286,7 +280,6 @@ const AppContent: React.FC = () => {
             )}
             <MenuItem icon={<ProductsIcon />} label={t.navigation.products} id="products" />
             <MenuItem icon={<ClientsIcon />} label={t.navigation.clients} id="clients" />
-            <MenuItem icon={<DeliveriesIcon />} label={t.navigation.deliveries} id="deliveries" />
             <MenuItem icon={<InventoryIcon />} label={t.navigation.inventory} id="inventory" />
             
             {isMenuOpen && (
@@ -297,21 +290,8 @@ const AppContent: React.FC = () => {
               </div>
             )}
               <MenuItem icon={<ReportsIcon />} label={t.navigation.reports} id="reports" />
-              <MenuItem icon={<BusinessIntelligenceIcon />} label={t.navigation.businessIntelligence} id="business-intelligence" />
               <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
             </nav>
-
-            {/* Order Management Section */}
-            <div className="px-1 mt-6">
-              {isMenuOpen && (
-                <div className="px-2 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Order Management
-                </div>
-              )}
-              <nav className="space-y-1">
-                <MenuItem icon={<DeliveriesIcon />} label="📋 Order Tracking" id="order-tracking" />
-              </nav>
-            </div>
 
             {/* Workflow Portals Section */}
             <div className="px-1 mt-6">
@@ -438,6 +418,9 @@ const AppContent: React.FC = () => {
             <AlertCenter t={t} />
           </div>
         </div>
+        
+        {/* Quick Order Floating Button */}
+        <QuickOrderButton t={t} showToast={showToast} />
         
         {/* Mobile overlay */}
         {isMenuOpen && (
