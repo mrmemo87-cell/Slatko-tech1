@@ -60,7 +60,7 @@ const AppContent: React.FC = () => {
         
         // Check if migration already completed
         const migrationComplete = localStorage.getItem('migration_completed');
-        if (migrationComplete) {
+        if (migrationComplete === 'true') {
           console.log('✅ Migration already completed, skipping...');
           return;
         }

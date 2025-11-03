@@ -22,6 +22,10 @@ class WorkflowService {
           updated_at: new Date().toISOString(),
           ...(newStage === 'in_production' && { production_start_time: new Date().toISOString() }),
           ...(newStage === 'ready_for_delivery' && { production_completed_time: new Date().toISOString() }),
+          ...(newStage === 'out_for_delivery' && { 
+            assigned_driver: userId,
+            delivery_start_time: new Date().toISOString() 
+          }),
           ...(newStage === 'delivered' && { delivery_completed_time: new Date().toISOString() }),
         })
         .eq('id', deliveryId);

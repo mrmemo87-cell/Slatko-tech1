@@ -25,13 +25,9 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
   useEffect(() => {
     loadDeliveryData();
     
-    // Subscribe to real-time updates
-    const unsubscribe = workflowService.subscribeToWorkflowUpdates(
-      'delivery',
-      handleRealTimeUpdate
-    );
-
-    return () => unsubscribe();
+    // Skip real-time subscriptions for better performance
+    // Data will refresh on manual actions or page reload
+    
   }, []);
 
   const loadDeliveryData = async () => {
@@ -50,6 +46,19 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
         ['out_for_delivery', 'delivered'].includes(order.workflowStage || '')
       );
       
+      console.log('🚚 Delivery Portal Data:', {
+        totalDeliveries: deliveries.length,
+        readyCount: ready.length,
+        myRouteCount: myRoute.length,
+        currentUserId: currentUser.id,
+        myRouteOrders: myRoute.map(o => ({ 
+          id: o.id, 
+          invoiceNumber: o.invoiceNumber, 
+          workflowStage: o.workflowStage, 
+          assignedDriver: o.assignedDriver 
+        }))
+      });
+      
       setReadyOrders(ready);
       setMyDeliveries(myRoute);
     } catch (error) {
@@ -60,10 +69,7 @@ export const DeliveryPortal: React.FC<DeliveryPortalProps> = ({
     }
   };
 
-  const handleRealTimeUpdate = (update: any) => {
-    console.log('Delivery portal real-time update:', update);
-    loadDeliveryData();
-  };
+  // Removed real-time updates for better performance
 
   const pickupOrder = async (orderId: string) => {
     try {
