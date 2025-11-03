@@ -1,6 +1,10 @@
 -- Workflow Enhancement Migration for Slatko Confectionery Management
 -- Add workflow tracking columns to support complete production and delivery workflow
 
+-- Add missing production_time column to products table
+ALTER TABLE public.products 
+ADD COLUMN IF NOT EXISTS production_time INTEGER DEFAULT 30;
+
 -- Add workflow columns to deliveries table
 ALTER TABLE public.deliveries 
 ADD COLUMN IF NOT EXISTS workflow_stage VARCHAR(50) DEFAULT 'order_placed' 
@@ -126,6 +130,7 @@ CREATE TABLE IF NOT EXISTS public.settlement_details (
 );
 
 -- Add indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_products_production_time ON public.products(production_time);
 CREATE INDEX IF NOT EXISTS idx_deliveries_workflow_stage ON public.deliveries(workflow_stage);
 CREATE INDEX IF NOT EXISTS idx_deliveries_assigned_driver ON public.deliveries(assigned_driver);
 CREATE INDEX IF NOT EXISTS idx_deliveries_production_start ON public.deliveries(production_start_time);
@@ -210,6 +215,11 @@ CREATE POLICY "Authenticated users can view settlement details" ON public.settle
 
 CREATE POLICY "Authenticated users can manage settlement details" ON public.settlement_details
   FOR ALL USING (auth.role() = 'authenticated');
+
+-- Update existing products to have default production time
+UPDATE public.products 
+SET production_time = 30 
+WHERE production_time IS NULL;
 
 -- Update existing deliveries to have default workflow stage
 UPDATE public.deliveries 

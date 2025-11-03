@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   description TEXT,
   is_active BOOLEAN DEFAULT true,
   shelf_life_days INTEGER DEFAULT 7,
+  production_time INTEGER DEFAULT 30,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
