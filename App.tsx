@@ -233,10 +233,10 @@ const AppContent: React.FC = () => {
           isMenuOpen ? 'w-64' : 'w-16'
         } fixed left-0 top-0 h-full z-50 lg:relative lg:z-0 ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}>
+        } flex flex-col`}>
           
           {/* Logo and Toggle */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
             <div className={`flex items-center ${isMenuOpen ? '' : 'justify-center'}`}>
               <SlatkoIcon className="h-8 w-8 text-blue-600" />
               {isMenuOpen && <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>}
@@ -251,8 +251,10 @@ const AppContent: React.FC = () => {
             </button>
           </div>
 
-          {/* Navigation Menu */}
-          <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+          {/* Scrollable Navigation Container */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Navigation Menu */}
+            <nav className="p-2 space-y-1">
             {!isMenuOpen && (
               <div className="px-2 py-1 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-center">
                 •••
@@ -296,35 +298,40 @@ const AppContent: React.FC = () => {
                 </div>
               </div>
             )}
-            <MenuItem icon={<ReportsIcon />} label={t.navigation.reports} id="reports" />
-            <MenuItem icon={<BusinessIntelligenceIcon />} label={t.navigation.businessIntelligence} id="business-intelligence" />
-            <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
-          </nav>
-
-          {/* Order Management Section */}
-          <div className="px-3 mt-6">
-            <div className={`text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 ${!isMenuOpen ? 'sr-only' : ''}`}>
-              Order Management
-            </div>
-            <nav className="space-y-1">
-              <MenuItem icon={<DeliveriesIcon />} label="📋 Order Tracking" id="order-tracking" />
+              <MenuItem icon={<ReportsIcon />} label={t.navigation.reports} id="reports" />
+              <MenuItem icon={<BusinessIntelligenceIcon />} label={t.navigation.businessIntelligence} id="business-intelligence" />
+              <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
             </nav>
-          </div>
 
-          {/* Workflow Portals Section */}
-          <div className="px-3 mt-6">
-            <div className={`text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 ${!isMenuOpen ? 'sr-only' : ''}`}>
-              Workflow Portals
+            {/* Order Management Section */}
+            <div className="px-1 mt-6">
+              {isMenuOpen && (
+                <div className="px-2 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Order Management
+                </div>
+              )}
+              <nav className="space-y-1">
+                <MenuItem icon={<DeliveriesIcon />} label="📋 Order Tracking" id="order-tracking" />
+              </nav>
             </div>
-            <nav className="space-y-1">
-              <MenuItem icon={<ProductionIcon />} label="🏭 Production Portal" id="production-portal" />
-              <MenuItem icon={<DeliveriesIcon />} label="🚚 Delivery Portal" id="delivery-portal" />
-              <MenuItem icon={<BusinessIntelligenceIcon />} label="👑 Admin Portal" id="admin-portal" />
-            </nav>
+
+            {/* Workflow Portals Section */}
+            <div className="px-1 mt-6">
+              {isMenuOpen && (
+                <div className="px-2 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Workflow Portals
+                </div>
+              )}
+              <nav className="space-y-1">
+                <MenuItem icon={<ProductionIcon />} label="🏭 Production Portal" id="production-portal" />
+                <MenuItem icon={<DeliveriesIcon />} label="🚚 Delivery Portal" id="delivery-portal" />
+                <MenuItem icon={<BusinessIntelligenceIcon />} label="👑 Admin Portal" id="admin-portal" />
+              </nav>
+            </div>
           </div>
 
           {/* Bottom Settings Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 p-2 space-y-1">
+          <div className="border-t border-slate-200 dark:border-slate-700 p-2 space-y-1 flex-shrink-0 mt-auto">
             {isMenuOpen && (
               <div className="px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Settings

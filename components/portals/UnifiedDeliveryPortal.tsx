@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
+import { PaymentManager } from '../payment/PaymentManager';
+import { ClientPaymentSheetView } from '../payment/ClientPaymentSheetView';
 import { showToast } from '../../utils/toast';
 
 export const UnifiedDeliveryPortal: React.FC = () => {
@@ -14,6 +16,12 @@ export const UnifiedDeliveryPortal: React.FC = () => {
   }>({ readyForPickup: [], myRoute: [], completed: [], allOrders: [] });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'my-route' | 'completed'>('all');
+  
+  // Payment management state
+  const [showPaymentManager, setShowPaymentManager] = useState(false);
+  const [showClientPaymentSheet, setShowClientPaymentSheet] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<WorkflowOrder | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const currentUser = {
     id: user?.id || 'unknown',
@@ -147,27 +155,42 @@ export const UnifiedDeliveryPortal: React.FC = () => {
     try {
       console.log('💰 Starting settlement for order:', orderId);
       
-      if (!currentUser?.id) {
-        throw new Error('Current user ID is missing');
+      // Find the order to get client information
+      const order = [...orders.allOrders].find(o => o.id === orderId);
+      if (!order) {
+        throw new Error('Order not found');
       }
       
-      await unifiedWorkflow.updateOrderStage(
-        orderId,
-        'settlement',
-        currentUser.id,
-        'delivery',
-        `Settlement started by ${currentUser.name || 'Driver'}`
-      );
-      
-      // Reload data after settlement
-      await loadDeliveryData();
-      
-      showToast('💰 Settlement process started', 'success');
+      // Open payment manager instead of directly completing settlement
+      setSelectedOrderForPayment(order);
+      setShowPaymentManager(true);
       
     } catch (error) {
       console.error('❌ Error starting settlement:', error);
       showToast(`Error starting settlement: ${error.message || 'Unknown error'}`, 'error');
     }
+  };
+
+  const handlePaymentComplete = async (settlementId: string) => {
+    try {
+      // Close payment manager
+      setShowPaymentManager(false);
+      setSelectedOrderForPayment(null);
+      
+      // Reload data to reflect payment changes
+      await loadDeliveryData();
+      
+      showToast('💰 Settlement completed successfully!', 'success');
+      
+    } catch (error) {
+      console.error('❌ Error after payment completion:', error);
+      showToast(`Error updating after payment: ${error.message || 'Unknown error'}`, 'error');
+    }
+  };
+
+  const handleViewClientPaymentSheet = (clientId: string) => {
+    setSelectedClientId(clientId);
+    setShowClientPaymentSheet(true);
   };
 
   const getTabCounts = () => ({
@@ -304,6 +327,15 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 onClick: pickupOrder,
                 variant: 'primary',
                 icon: '📦'
+              },
+              {
+                label: 'Payment Sheet',
+                onClick: (orderId) => {
+                  const order = orders.readyForPickup.find(o => o.id === orderId);
+                  if (order) handleViewClientPaymentSheet(order.client_id);
+                },
+                variant: 'secondary',
+                icon: '📋'
               }
             ]}
           />
@@ -321,6 +353,15 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 onClick: markDelivered,
                 variant: 'success',
                 icon: '✅'
+              },
+              {
+                label: 'Payment Sheet',
+                onClick: (orderId) => {
+                  const orderData = orders.myRoute.find(o => o.id === orderId);
+                  if (orderData) handleViewClientPaymentSheet(orderData.client_id);
+                },
+                variant: 'secondary',
+                icon: '📋'
               }
             ] : [
               {
@@ -328,6 +369,15 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 onClick: startSettlement,
                 variant: 'primary',
                 icon: '💰'
+              },
+              {
+                label: 'Payment Sheet',
+                onClick: (orderId) => {
+                  const orderData = orders.myRoute.find(o => o.id === orderId);
+                  if (orderData) handleViewClientPaymentSheet(orderData.client_id);
+                },
+                variant: 'secondary',
+                icon: '📋'
               }
             ]}
           />
@@ -473,6 +523,31 @@ export const UnifiedDeliveryPortal: React.FC = () => {
             Delivered orders will appear here after settlement is complete.
           </p>
         </div>
+      )}
+
+      {/* Payment Management Modals */}
+      {showPaymentManager && selectedOrderForPayment && (
+        <PaymentManager
+          deliveryId={selectedOrderForPayment.id}
+          clientId={selectedOrderForPayment.client_id}
+          clientName={selectedOrderForPayment.client_name || 'Unknown Client'}
+          driverId={currentUser.id}
+          onPaymentComplete={handlePaymentComplete}
+          onCancel={() => {
+            setShowPaymentManager(false);
+            setSelectedOrderForPayment(null);
+          }}
+        />
+      )}
+
+      {showClientPaymentSheet && selectedClientId && (
+        <ClientPaymentSheetView
+          clientId={selectedClientId}
+          onClose={() => {
+            setShowClientPaymentSheet(false);
+            setSelectedClientId(null);
+          }}
+        />
       )}
     </div>
   );
