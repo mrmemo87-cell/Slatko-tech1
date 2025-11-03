@@ -91,6 +91,7 @@ class WorkflowService {
     const productionTasks = deliveryItems.map(item => ({
       delivery_id: deliveryId,
       product_id: item.product_id,
+      task_name: `Produce ${item.quantity}x ${item.products.name}`,
       product_name: item.products.name,
       quantity: item.quantity,
       priority: this.calculatePriority(deliveryId, item.quantity),
