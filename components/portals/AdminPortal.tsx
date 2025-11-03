@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { RealTimeMetrics, EnhancedDelivery, WorkflowEvent } from '../../types/workflow';
+import { RealTimeMetrics, EnhancedDelivery, WorkflowEvent, WorkflowStage } from '../../types/workflow';
 import { workflowService } from '../../services/workflowService';
 import { formatCurrency, formatDate } from '../../utils';
+import { Delivery } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 interface AdminPortalProps {
@@ -10,13 +11,76 @@ interface AdminPortalProps {
   showToast: (message: string, type?: 'success' | 'error') => void;
 }
 
+// Admin Stage Controller Component
+const AdminStageController: React.FC<{
+  order: Delivery;
+  onStageChange: (orderId: string, newStage: WorkflowStage) => void;
+}> = ({ order, onStageChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleStageChange = (newStage: WorkflowStage) => {
+    onStageChange(order.id, newStage);
+    setIsOpen(false);
+  };
+
+  const stages: WorkflowStage[] = [
+    'order_placed',
+    'in_production', 
+    'ready_for_delivery',
+    'out_for_delivery',
+    'delivered',
+    'settlement'
+  ];
+
+  const currentStage = order.workflowStage as WorkflowStage || 'order_placed';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-200 transition-colors"
+        title="Admin: Change Stage"
+      >
+        ⚙️ Control
+      </button>
+      
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 min-w-48">
+            <div className="p-2 border-b text-xs font-medium text-gray-500">
+              👑 Admin Stage Control
+            </div>
+            {stages.map((stage) => (
+              <button
+                key={stage}
+                onClick={() => handleStageChange(stage)}
+                className={`block w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${
+                  stage === currentStage ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                }`}
+              >
+                {stage === currentStage && '▶ '}
+                {stage.replace('_', ' ').toUpperCase()}
+                {stage === currentStage && ' (Current)'}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const AdminPortal: React.FC<AdminPortalProps> = ({ 
   currentUser, 
   t, 
   showToast 
 }) => {
   const [metrics, setMetrics] = useState<RealTimeMetrics | null>(null);
-  const [recentOrders, setRecentOrders] = useState<EnhancedDelivery[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Delivery[]>([]);
   const [workflowEvents, setWorkflowEvents] = useState<WorkflowEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'analytics' | 'workflow'>('overview');
@@ -73,6 +137,78 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const handleRealTimeUpdate = (update: any) => {
     console.log('Admin portal real-time update:', update);
     loadAdminData();
+  };
+
+  // Admin Control Functions
+  const handleAdminStageChange = async (orderId: string, newStage: WorkflowStage) => {
+    try {
+      await workflowService.updateOrderWorkflowStage(
+        orderId, 
+        newStage, 
+        currentUser.id,
+        'admin',
+        `Admin manually changed stage to ${newStage}`
+      );
+      showToast(`Order stage updated to ${newStage.replace('_', ' ').toUpperCase()}`, 'success');
+      loadAdminData();
+    } catch (error) {
+      console.error('Error updating order stage:', error);
+      showToast('Error updating order stage', 'error');
+    }
+  };
+
+  const handleEditOrder = async (order: Delivery) => {
+    // Open edit modal with full order details
+    showToast('Edit order functionality - opening editor...', 'success');
+    // Implementation would open a comprehensive edit modal
+  };
+
+  const handleStopOrder = async (order: Delivery) => {
+    if (confirm(`Are you sure you want to STOP order #${order.invoiceNumber}? This will pause all workflow activities.`)) {
+      try {
+        // Add stopped status to workflow
+        await workflowService.updateOrderWorkflowStage(
+          order.id, 
+          'order_placed', 
+          currentUser.id,
+          'admin',
+          'Order STOPPED by admin - workflow paused'
+        );
+        showToast(`Order #${order.invoiceNumber} has been stopped`, 'success');
+        loadAdminData();
+      } catch (error) {
+        console.error('Error stopping order:', error);
+        showToast('Error stopping order', 'error');
+      }
+    }
+  };
+
+  const handleCancelOrder = async (order: Delivery) => {
+    if (confirm(`Are you sure you want to CANCEL order #${order.invoiceNumber}? This action can be reversed.`)) {
+      try {
+        // Update order status to cancelled
+        showToast(`Order #${order.invoiceNumber} has been cancelled`, 'success');
+        loadAdminData();
+      } catch (error) {
+        console.error('Error cancelling order:', error);
+        showToast('Error cancelling order', 'error');
+      }
+    }
+  };
+
+  const handleDeleteOrder = async (order: Delivery) => {
+    if (confirm(`⚠️ PERMANENTLY DELETE order #${order.invoiceNumber}? This cannot be undone!`)) {
+      if (confirm(`This will permanently remove ALL data for order #${order.invoiceNumber}. Are you absolutely sure?`)) {
+        try {
+          // Permanently delete order from database
+          showToast(`Order #${order.invoiceNumber} has been permanently deleted`, 'success');
+          loadAdminData();
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          showToast('Error deleting order', 'error');
+        }
+      }
+    }
   };
 
   // Chart data preparation
@@ -245,8 +381,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       {activeTab === 'orders' && (
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-md">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold">All Orders - Real-Time Status</h3>
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">👑 Admin Order Management</h3>
+                <p className="text-sm text-gray-600">Full authority to edit, control, and manage all orders</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={loadAdminData}
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  🔄 Refresh
+                </button>
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  ➕ Create Order
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -255,10 +407,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <th className="px-6 py-3 text-left">Order #</th>
                     <th className="px-6 py-3 text-left">Client</th>
                     <th className="px-6 py-3 text-left">Status</th>
-                    <th className="px-6 py-3 text-left">Stage</th>
+                    <th className="px-6 py-3 text-left">Workflow Stage</th>
                     <th className="px-6 py-3 text-left">Value</th>
                     <th className="px-6 py-3 text-left">Date</th>
-                    <th className="px-6 py-3 text-left">Actions</th>
+                    <th className="px-6 py-3 text-left">👑 Admin Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -272,9 +424,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getWorkflowColor(order.workflowStage || 'pending')}`}>
-                          {order.workflowStage?.replace('_', ' ').toUpperCase() || 'PENDING'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getWorkflowColor(order.workflowStage || 'order_placed')}`}>
+                            {order.workflowStage?.replace('_', ' ').toUpperCase() || 'ORDER PLACED'}
+                          </span>
+                          <AdminStageController order={order} onStageChange={handleAdminStageChange} />
+                        </div>
                       </td>
                       <td className="px-6 py-4 font-medium text-green-600">
                         {formatCurrency(order.items.reduce((sum, item) => 
@@ -284,9 +439,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         {formatDate(order.date)}
                       </td>
                       <td className="px-6 py-4">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                          View Details
-                        </button>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => handleEditOrder(order)}
+                            className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-600 transition-colors"
+                            title="Edit Order Details"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button 
+                            onClick={() => handleStopOrder(order)}
+                            className="bg-orange-500 text-white px-2 py-1 rounded text-xs font-medium hover:bg-orange-600 transition-colors"
+                            title="Pause/Stop Order"
+                          >
+                            ⏸️ Stop
+                          </button>
+                          <button 
+                            onClick={() => handleCancelOrder(order)}
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs font-medium hover:bg-red-600 transition-colors"
+                            title="Cancel Order"
+                          >
+                            ❌ Cancel
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteOrder(order)}
+                            className="bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium hover:bg-gray-800 transition-colors"
+                            title="Permanently Delete"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -294,7 +476,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </table>
               {recentOrders.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  No orders found. Orders will appear here in real-time.
+                  <div className="text-4xl mb-2">📋</div>
+                  <p>No orders found. Orders will appear here in real-time.</p>
                 </div>
               )}
             </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Client, Product, DeliveryItem } from '../../types';
 import { supabaseApi } from '../../services/supabase-api';
+import { workflowService } from '../../services/workflowService';
 import { generateId, todayISO, formatCurrency } from '../../utils';
 import { PRODUCT_CATEGORIES, groupProductsByCategory } from '../../constants/productCategories';
 
@@ -399,14 +400,32 @@ export const QuickDelivery: React.FC<QuickDeliveryProps> = ({ t, showToast, onCl
       setIsSubmitting(true);
       try {
         // Create delivery using Supabase API
-        await supabaseApi.createDelivery({
+        const newDelivery = await supabaseApi.createDelivery({
           date: new Date().toISOString(),
           clientId: selectedClient.id,
           items: cart,
           notes: `Quick order - ${new Date().toLocaleTimeString()}`
         });
         
-        showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`);
+        // 🚀 AUTOMATICALLY ADD TO WORKFLOW TRACKING SYSTEM
+        if (newDelivery && newDelivery.id) {
+          try {
+            await workflowService.updateOrderWorkflowStage(
+              newDelivery.id,
+              'order_placed',
+              'quick_order_system',
+              'sales',
+              `Order placed via Quick Order system for ${selectedClient.name} - Total: ${formatCurrency(total)}`
+            );
+            
+            showToast(`✅ Order created and tracked! ${selectedClient.name} - ${formatCurrency(total)}. Check Order Tracking to monitor progress.`);
+          } catch (workflowError) {
+            console.warn('Order created but workflow tracking failed:', workflowError);
+            showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`, 'success');
+          }
+        } else {
+          showToast(`Order created for ${selectedClient.name} - ${formatCurrency(total)}`, 'success');
+        }
         
         // Refresh client data to get updated lastOrderDate
         await loadData();

@@ -17,6 +17,7 @@ import { MobileActionButton } from './components/ui/MobileActionButton';
 import { ProductionPortal } from './components/portals/ProductionPortal';
 import { DeliveryPortal } from './components/portals/DeliveryPortal';
 import { AdminPortal } from './components/portals/AdminPortal';
+import { OrderTracking } from './components/views/OrderTracking';
 import { User } from './types/workflow';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import { LoginForm } from './components/auth/LoginForm';
@@ -26,7 +27,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
 import { generateId } from './utils';
 
-type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'deliveries' | 'reports' | 'materials' | 'purchases' | 'business-intelligence' | 'import' | 'production-portal' | 'delivery-portal' | 'admin-portal';
+type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'deliveries' | 'reports' | 'materials' | 'purchases' | 'business-intelligence' | 'import' | 'order-tracking' | 'production-portal' | 'delivery-portal' | 'admin-portal';
 
 const AppContent: React.FC = () => {
   const { user, loading, signOut } = useAuth();
@@ -157,6 +158,8 @@ const AppContent: React.FC = () => {
         return <BusinessMetricsDashboard t={t} />;
       case 'import':
         return <BulkImport {...props} />;
+      case 'order-tracking':
+        return <OrderTracking t={t} showToast={showToast} />;
       case 'production-portal':
         return <ProductionPortal currentUser={user as User} t={t} showToast={showToast} />;
       case 'delivery-portal':
@@ -269,12 +272,22 @@ const AppContent: React.FC = () => {
             <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
           </nav>
 
+          {/* Order Management Section */}
+          <div className="px-3 mt-6">
+            <div className={`text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 ${!isMenuOpen ? 'sr-only' : ''}`}>
+              Order Management
+            </div>
+            <nav className="space-y-1">
+              <MenuItem icon={<DeliveriesIcon />} label="📋 Order Tracking" id="order-tracking" />
+            </nav>
+          </div>
+
           {/* Workflow Portals Section */}
           <div className="px-3 mt-6">
             <div className={`text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 ${!isMenuOpen ? 'sr-only' : ''}`}>
               Workflow Portals
             </div>
-                        <nav className="space-y-1">
+            <nav className="space-y-1">
               <MenuItem icon={<ProductionIcon />} label="🏭 Production Portal" id="production-portal" />
               <MenuItem icon={<DeliveriesIcon />} label="🚚 Delivery Portal" id="delivery-portal" />
               <MenuItem icon={<BusinessIntelligenceIcon />} label="👑 Admin Portal" id="admin-portal" />
