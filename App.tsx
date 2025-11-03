@@ -189,7 +189,7 @@ const AppContent: React.FC = () => {
         {/* COMPACT SIDEBAR */}
         <aside className={`no-print bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-300 ${
           isMenuOpen ? 'w-64' : 'w-16'
-        } fixed left-0 top-0 h-full z-50 lg:relative lg:z-0 lg:translate-x-0 ${
+        } fixed left-0 top-0 h-full z-50 lg:relative lg:z-0 ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}>
           
@@ -200,7 +200,7 @@ const AppContent: React.FC = () => {
               {isMenuOpen && <span className="ml-2 text-xl font-bold text-slate-800 dark:text-white">Slatko</span>}
             </div>
             <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => setIsMenuOpen(false)}
               className="lg:hidden p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -344,9 +344,7 @@ const AppContent: React.FC = () => {
         </aside>
         
         {/* Main Content Area */}
-        <div className={`flex-1 transition-all duration-300 ${
-          isMenuOpen ? 'lg:ml-0' : 'lg:ml-0'
-        } ${isMenuOpen && window.innerWidth < 1024 ? 'ml-64' : ''}`}>
+        <div className="flex-1 transition-all duration-300 lg:ml-0">
           
           {/* Top bar for mobile with toggle and alert center */}
           <div className="lg:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-4 flex items-center justify-between sticky top-0 z-40">

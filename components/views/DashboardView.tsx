@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { formatCurrency } from '../../utils';
 import { Product, Client, Delivery } from '../../types';
 import { useProducts, useClients, useDeliveries, useProductionBatches } from '../../hooks/useDataQueries';
+import { DailyOrderPlanning } from '../ui/DailyOrderPlanning';
 
 interface DashboardViewProps {
   // FIX: Changed 't' prop type from TranslationFunction to 'any' to match the shape of the translation object.
@@ -78,52 +79,72 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const recentDeliveries = deliveries.filter(d => new Date(d.date) >= thirtyDaysAgo && d.status !== 'Pending');
+    // Include both Settled and Paid deliveries for sales data
+    const recentDeliveries = deliveries.filter(d => {
+      const deliveryDate = new Date(d.date);
+      return deliveryDate >= thirtyDaysAgo && (d.status === 'Settled' || d.status === 'Paid');
+    });
 
-    const salesByProduct = recentDeliveries.flatMap(d => {
-        return d.items.map(item => {
-            const returnedQty = d.returnedItems?.find(r => r.productId === item.productId)?.quantity || 0;
-            const soldQty = item.quantity - returnedQty;
-            return {
-                productId: item.productId,
-                sold: soldQty,
-                revenue: soldQty * item.price,
-            };
-        });
-    }).reduce((acc, sale) => {
-        if (!acc[sale.productId]) {
-            acc[sale.productId] = { revenue: 0 };
+    console.log('Chart data calculation:', {
+      totalDeliveries: deliveries.length,
+      recentDeliveries: recentDeliveries.length,
+      thirtyDaysAgo: thirtyDaysAgo.toISOString().split('T')[0]
+    });
+
+    const salesByProduct = recentDeliveries.reduce((acc, d) => {
+      if (!d.items || d.items.length === 0) return acc;
+      
+      d.items.forEach(item => {
+        const returnedQty = d.returnedItems?.find(r => r.productId === item.productId)?.quantity || 0;
+        const soldQty = Math.max(0, item.quantity - returnedQty);
+        const revenue = soldQty * item.price;
+        
+        if (!acc[item.productId]) {
+          acc[item.productId] = { revenue: 0 };
         }
-        acc[sale.productId].revenue += sale.revenue;
-        return acc;
+        acc[item.productId].revenue += revenue;
+      });
+      return acc;
     }, {} as Record<string, { revenue: number }>);
     
     const productChart = Object.entries(salesByProduct).map(([productId, data]) => {
         const product = products.find(p => p.id === productId);
-        return { name: product?.name || 'Unknown', Sales: (data as any).revenue };
-    }).filter(p => p.Sales > 0);
+        return { 
+          name: product?.name || `Product ${productId.slice(-4)}`, 
+          Sales: data.revenue 
+        };
+    }).filter(p => p.Sales > 0)
+     .sort((a, b) => b.Sales - a.Sales)
+     .slice(0, 10); // Top 10 products
 
     const salesByClient = recentDeliveries.reduce((acc, d) => {
       const client = clients.find(c => c.id === d.clientId);
-      if (!client) return acc;
+      const clientName = client?.businessName || client?.name || `Client ${d.clientId.slice(-4)}`;
 
-      const deliveryTotal = d.items.reduce((sum, item) => {
+      const deliveryTotal = (d.items || []).reduce((sum, item) => {
         const returnedQty = d.returnedItems?.find(r => r.productId === item.productId)?.quantity || 0;
-        const soldQty = item.quantity - returnedQty;
-        return sum + soldQty * item.price;
+        const soldQty = Math.max(0, item.quantity - returnedQty);
+        return sum + (soldQty * item.price);
       }, 0);
 
-      if(!acc[client.businessName]) {
-        acc[client.businessName] = { Sales: 0 };
+      if (!acc[clientName]) {
+        acc[clientName] = { Sales: 0 };
       }
-      acc[client.businessName].Sales += deliveryTotal;
+      acc[clientName].Sales += deliveryTotal;
       return acc;
     }, {} as Record<string, { Sales: number }>);
 
     const clientChart = Object.entries(salesByClient).map(([clientName, data]) => ({
       name: clientName,
-      Sales: (data as any).Sales,
-    })).filter(c => c.Sales > 0);
+      Sales: data.Sales,
+    })).filter(c => c.Sales > 0)
+     .sort((a, b) => b.Sales - a.Sales)
+     .slice(0, 8); // Top 8 clients
+
+    console.log('Chart results:', {
+      productChart: productChart.length,
+      clientChart: clientChart.length
+    });
 
     return { productChart, clientChart };
   }, [deliveries, products, clients]);
@@ -150,7 +171,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
         <StatCard title={t.dashboard.totalReceivables} value={formatCurrency(metrics.totalReceivables)} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Daily Order Planning - Primary Feature for Workers */}
+      <DailyOrderPlanning 
+        deliveries={deliveries}
+        products={products}
+        clients={clients}
+        t={t}
+      />
+
+      {/* Sales Analytics Charts - Secondary Information */}
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-8">
+        <h2 className="text-xl font-semibold text-slate-800 dark:text-white mb-6">Sales Analytics (Last 30 Days)</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-md">
           <h2 className="text-lg font-semibold mb-4 text-slate-800 dark:text-white">{t.dashboard.salesByProduct}</h2>
           {chartData.productChart.length > 0 ? (
@@ -211,6 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t }) => {
            ) : (
             <div className="flex items-center justify-center h-[300px] text-slate-500">{t.dashboard.noData}</div>
           )}
+          </div>
         </div>
       </div>
     </div>
