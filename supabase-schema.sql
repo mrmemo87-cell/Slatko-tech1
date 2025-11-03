@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS public.production_material_costs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Deliveries table
+-- Deliveries table with workflow support
 CREATE TABLE IF NOT EXISTS public.deliveries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   invoice_number VARCHAR(100) UNIQUE NOT NULL,
@@ -102,6 +102,19 @@ CREATE TABLE IF NOT EXISTS public.deliveries (
   date DATE NOT NULL,
   status VARCHAR(20) DEFAULT 'Pending' CHECK (status IN ('Pending', 'Settled', 'Paid')),
   notes TEXT,
+  -- Workflow tracking columns
+  workflow_stage VARCHAR(50) DEFAULT 'order_placed' 
+    CHECK (workflow_stage IN ('order_placed', 'production_queue', 'in_production', 'quality_check', 'ready_for_delivery', 'out_for_delivery', 'delivered', 'settlement', 'completed')),
+  assigned_driver VARCHAR(255),
+  production_notes TEXT,
+  delivery_notes TEXT,
+  production_start_time TIMESTAMP WITH TIME ZONE,
+  production_completed_time TIMESTAMP WITH TIME ZONE,
+  delivery_start_time TIMESTAMP WITH TIME ZONE,
+  delivery_completed_time TIMESTAMP WITH TIME ZONE,
+  estimated_delivery_time TIMESTAMP WITH TIME ZONE,
+  actual_delivery_time TIMESTAMP WITH TIME ZONE,
+  quality_score INTEGER CHECK (quality_score >= 1 AND quality_score <= 5),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -187,6 +200,11 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_client_id ON public.deliveries(client_
 CREATE INDEX IF NOT EXISTS idx_deliveries_date ON public.deliveries(date);
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON public.deliveries(status);
 CREATE INDEX IF NOT EXISTS idx_deliveries_invoice ON public.deliveries(invoice_number);
+-- Workflow indexes
+CREATE INDEX IF NOT EXISTS idx_deliveries_workflow_stage ON public.deliveries(workflow_stage);
+CREATE INDEX IF NOT EXISTS idx_deliveries_assigned_driver ON public.deliveries(assigned_driver);
+CREATE INDEX IF NOT EXISTS idx_deliveries_production_start ON public.deliveries(production_start_time);
+CREATE INDEX IF NOT EXISTS idx_deliveries_delivery_date ON public.deliveries(delivery_completed_time);
 
 CREATE INDEX IF NOT EXISTS idx_delivery_items_delivery_id ON public.delivery_items(delivery_id);
 CREATE INDEX IF NOT EXISTS idx_delivery_items_product_id ON public.delivery_items(product_id);
