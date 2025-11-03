@@ -36,15 +36,28 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
   const loadProductionData = async () => {
     try {
       setLoading(true);
-      const [deliveries, tasks] = await Promise.all([
+      const [deliveries, tasks, clients, products] = await Promise.all([
         supabaseApi.getDeliveries(),
-        loadProductionTasks()
+        loadProductionTasks(),
+        supabaseApi.getClients(), // Load client names
+        supabaseApi.getProducts() // Load product names
       ]);
+      
+      // Create lookup maps for names
+      const clientsMap = new Map(clients.map(client => [client.id, client.name || client.businessName]));
+      const productsMap = new Map(products.map(product => [product.id, product.name]));
       
       // Filter orders relevant to production - include 'order_placed' as these need production
       const productionOrders = deliveries.filter(order => 
         ['order_placed', 'production_queue', 'in_production', 'quality_check', 'ready_for_delivery'].includes(order.workflowStage || 'order_placed')
-      );
+      ).map(order => ({
+        ...order,
+        clientName: clientsMap.get(order.clientId) || 'Unknown Client',
+        items: order.items.map(item => ({
+          ...item,
+          productName: productsMap.get(item.productId) || 'Unknown Product'
+        }))
+      }));
       
       console.log('🏭 Production Portal: Loaded', productionOrders.length, 'orders for production');
       
@@ -70,30 +83,39 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
 
   const startProduction = async (orderId: string) => {
     try {
+      console.log('🏭 Starting production for order:', orderId);
+      console.log('👤 Current user:', currentUser);
+      
       await workflowService.updateOrderWorkflowStage(
         orderId,
         'in_production',
         currentUser.id,
         'production',
-        `Production started by ${currentUser.name}`
+        `Production started by ${currentUser.name || 'Worker'}`
       );
-      showToast('Production started successfully');
+      
+      showToast('✅ Production started! Order moved to In Progress', 'success');
+      loadProductionData(); // Refresh data to show updated status
     } catch (error) {
-      console.error('Error starting production:', error);
-      showToast('Error starting production', 'error');
+      console.error('❌ Error starting production:', error);
+      showToast(`Error starting production: ${error.message || 'Unknown error'}`, 'error');
     }
   };
 
   const completeProduction = async (orderId: string, qualityNotes?: string) => {
     try {
+      console.log('🏭 Completing production for order:', orderId);
+      
       await workflowService.updateOrderWorkflowStage(
         orderId,
         'ready_for_delivery',
         currentUser.id,
         'production',
-        `Production completed by ${currentUser.name}. Quality notes: ${qualityNotes || 'None'}`
+        `Production completed by ${currentUser.name || 'Worker'}. Quality notes: ${qualityNotes || 'None'}`
       );
-      showToast('Order marked as ready for delivery');
+      
+      showToast('✅ Order ready for delivery! Moved to pickup queue', 'success');
+      loadProductionData(); // Refresh data
     } catch (error) {
       console.error('Error completing production:', error);
       showToast('Error completing production', 'error');
@@ -131,15 +153,18 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
-          🏭 Production Portal
-        </h1>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 dark:text-white">
+            👨‍� Kitchen Production Center
+          </h1>
+          <p className="text-gray-600 mt-1">Prepare orders for today's deliveries</p>
+        </div>
         <div className="flex items-center space-x-4 text-sm">
-          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-            {orders.filter(o => o.workflowStage === 'in_production').length} In Production
+          <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-medium">
+            {orders.filter(o => o.workflowStage === 'in_production').length} 🔥 Cooking Now
           </span>
-          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
-            {orders.filter(o => ['order_placed', 'production_queue'].includes(o.workflowStage || 'order_placed')).length} In Queue
+          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+            {orders.filter(o => ['order_placed', 'production_queue'].includes(o.workflowStage || 'order_placed')).length} 📋 To Prepare
           </span>
         </div>
       </div>
@@ -157,9 +182,9 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              {tab === 'queue' && '📋 Production Queue'}
-              {tab === 'in-progress' && '⚙️ In Progress'}
-              {tab === 'completed' && '✅ Completed'}
+              {tab === 'queue' && '📋 Orders to Prepare'}
+              {tab === 'in-progress' && '👨‍🍳 Cooking Now'}
+              {tab === 'completed' && '✅ Ready for Pickup'}
             </button>
           ))}
         </nav>
@@ -186,8 +211,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                     Order #{order.invoiceNumber}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    {/* Client name would be resolved here */}
-                    Client: {order.clientId.slice(-6)}
+                    👤 Customer: {order.clientName || 'Unknown Client'}
                   </p>
                 </div>
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.workflowStage || 'pending')}`}>
@@ -208,10 +232,9 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                 </div>
 
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Value:</span>
-                  <span className="font-medium text-green-600">
-                    {formatCurrency(order.items?.reduce((sum, item) => 
-                      sum + (item.quantity * item.price), 0) || 0)}
+                  <span className="text-gray-600">Priority:</span>
+                  <span className="font-medium text-orange-600">
+                    {formatDate(order.date) === formatDate(new Date().toISOString()) ? '🔥 Today' : '📅 Scheduled'}
                   </span>
                 </div>
 
@@ -220,10 +243,13 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Production Items:</h4>
                   <div className="space-y-2">
                     {order.items?.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded">
-                        <span className="font-medium">{item.productId.slice(-4)}</span>
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                          {item.quantity} units
+                      <div key={index} className="flex justify-between items-center text-sm bg-gray-50 p-3 rounded-lg border-l-4 border-orange-400">
+                        <div>
+                          <div className="font-semibold text-gray-900">🍰 {item.productName || 'Unknown Product'}</div>
+                          <div className="text-xs text-gray-500">Production Recipe #{item.productId.slice(-4)}</div>
+                        </div>
+                        <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-bold">
+                          {item.quantity} qty
                         </span>
                       </div>
                     ))}
