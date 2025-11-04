@@ -13,7 +13,7 @@ interface SettlementModalProps {
   onComplete: () => void;
 }
 
-type SlideType = 'returns' | 'orders' | 'payment' | 'success';
+type SlideType = 'returns' | 'orders' | 'review' | 'payment' | 'success';
 
 export const SettlementModal: React.FC<SettlementModalProps> = ({
   clientId,
@@ -27,6 +27,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const [processing, setProcessing] = useState(false);
   
   // Data
+  const [currentOrder, setCurrentOrder] = useState<any>(null);
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [unpaidOrders, setUnpaidOrders] = useState<OrderPaymentRecord[]>([]);
   const [selectedReturns, setSelectedReturns] = useState<Array<{ productId: string; productName: string; quantity: number; maxQuantity: number }>>([]);
@@ -42,10 +43,19 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     try {
       setLoading(true);
       
-      // Get the last completed delivery for this client
+      // Get the current order being delivered
+      if (currentOrderId) {
+        const allDeliveries = await supabaseApi.getDeliveries(100);
+        const current = allDeliveries.find(d => d.id === currentOrderId);
+        if (current) {
+          setCurrentOrder(current);
+        }
+      }
+      
+      // Get the last completed delivery for this client (excluding current)
       const allDeliveries = await supabaseApi.getDeliveries(100);
       const clientDeliveries = allDeliveries
-        .filter(d => d.clientId === clientId)
+        .filter(d => d.clientId === clientId && d.id !== currentOrderId)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       if (clientDeliveries.length > 0) {
@@ -82,6 +92,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         ));
       }
     }
+  };
+
+  const handleOrderItemQuantityChange = (productId: string, delta: number) => {
+    if (!currentOrder) return;
+    
+    setCurrentOrder({
+      ...currentOrder,
+      items: currentOrder.items.map((item: any) => {
+        if (item.productId === productId) {
+          const newQuantity = item.quantity + delta;
+          return { ...item, quantity: Math.max(0, newQuantity) };
+        }
+        return item;
+      }).filter((item: any) => item.quantity > 0) // Remove items with 0 quantity
+    });
   };
 
   const handleNextFromReturns = async () => {
@@ -134,8 +159,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       }
     }
     
-    // Move to orders slide
-    setCurrentSlide('orders');
+    // Move to review slide (show current order)
+    setCurrentSlide('review');
   };
 
   const handlePaymentChoice = async (choice: 'now' | 'later') => {
@@ -248,7 +273,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   };
 
   const getTotalDue = () => {
-    const orderTotal = unpaidOrders.reduce((sum, o) => sum + o.amount_due, 0);
+    const orderTotal = unpaidOrders.reduce((sum, o) => sum + (o.amount_due || 0), 0);
     const returnsCredit = getTotalReturnsCredit();
     return Math.max(0, orderTotal - returnsCredit);
   };
@@ -387,7 +412,137 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             </div>
           )}
 
-          {/* Slide 2: Unpaid Orders */}
+          {/* Slide 2: Review Current Order */}
+          {currentSlide === 'review' && currentOrder && (
+            <div className="space-y-4 animate-slideInRight">
+              <h3 className="text-lg font-bold text-gray-900">Review & Confirm Order</h3>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="text-sm text-blue-600 font-medium">Current Order #{currentOrder.invoiceNumber}</div>
+                <div className="text-xs text-blue-500">{currentOrder.date}</div>
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {currentOrder.items && currentOrder.items.length > 0 ? (
+                  currentOrder.items.map((item: any) => {
+                    const itemPrice = item.price || 0;
+                    const itemTotal = item.quantity * itemPrice;
+                    
+                    return (
+                      <div
+                        key={item.productId}
+                        className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-all"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{item.productName}</div>
+                            <div className="text-sm text-gray-600">
+                              ${itemPrice.toFixed(2)} each
+                            </div>
+                          </div>
+                          
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOrderItemQuantityChange(item.productId, -1)}
+                              className="w-8 h-8 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors font-bold text-lg flex items-center justify-center"
+                            >
+                              −
+                            </button>
+                            <span className="w-12 text-center font-bold text-lg">{item.quantity}</span>
+                            <button
+                              onClick={() => handleOrderItemQuantityChange(item.productId, 1)}
+                              className="w-8 h-8 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors font-bold text-lg flex items-center justify-center"
+                            >
+                              +
+                            </button>
+                          </div>
+                          
+                          <div className="text-right">
+                            <div className="font-bold text-gray-900">${itemTotal.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No items in order
+                  </div>
+                )}
+              </div>
+
+              {/* Order Total */}
+              {currentOrder.items && currentOrder.items.length > 0 && (
+                <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-300">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-900">Order Total:</span>
+                    <span className="text-2xl font-bold text-green-600">
+                      ${currentOrder.items.reduce((sum: number, item: any) => sum + (item.quantity * (item.price || 0)), 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={async () => {
+                  // Update order items in database before proceeding
+                  if (currentOrder && currentOrderId) {
+                    try {
+                      setProcessing(true);
+                      
+                      // Delete existing items
+                      await supabase
+                        .from('delivery_items')
+                        .delete()
+                        .eq('delivery_id', currentOrderId);
+                      
+                      // Insert updated items
+                      const itemsToInsert = currentOrder.items.map((item: any) => ({
+                        delivery_id: currentOrderId,
+                        product_id: item.productId,
+                        quantity: item.quantity,
+                        price: item.price || 0,
+                        unit: item.unit || 'pcs'
+                      }));
+                      
+                      await supabase
+                        .from('delivery_items')
+                        .insert(itemsToInsert);
+                      
+                      // Update total amount in delivery
+                      const newTotal = currentOrder.items.reduce((sum: number, item: any) => 
+                        sum + (item.quantity * (item.price || 0)), 0
+                      );
+                      
+                      await supabase
+                        .from('deliveries')
+                        .update({ 
+                          amount_due: newTotal,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('id', currentOrderId);
+                      
+                      showToast('Order updated successfully!', 'success');
+                    } catch (error) {
+                      console.error('Error updating order:', error);
+                      showToast('Error updating order', 'error');
+                    } finally {
+                      setProcessing(false);
+                    }
+                  }
+                  
+                  setCurrentSlide('orders');
+                }}
+                disabled={processing || !currentOrder?.items || currentOrder.items.length === 0}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all"
+              >
+                {processing ? 'Updating...' : 'Confirm → Continue to Payment'}
+              </button>
+            </div>
+          )}
+
+          {/* Slide 3: Unpaid Orders */}
           {currentSlide === 'orders' && (
             <div className="space-y-4 animate-slideInRight">
               <h3 className="text-lg font-bold text-gray-900">Previous Orders</h3>
@@ -395,27 +550,31 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               {unpaidOrders.length > 0 ? (
                 <>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {unpaidOrders.map((order) => (
-                      <div
-                        key={order.delivery_id}
-                        className="p-4 border-2 border-red-300 bg-red-50 rounded-lg"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <div className="font-bold text-gray-900">Order #{order.invoice_number}</div>
-                            <div className="text-sm text-gray-600">{order.order_date}</div>
+                    {unpaidOrders.map((order) => {
+                      const amountDue = order.amount_due || 0;
+                      
+                      return (
+                        <div
+                          key={order.delivery_id}
+                          className="p-4 border-2 border-red-300 bg-red-50 rounded-lg"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-bold text-gray-900">Order #{order.invoice_number}</div>
+                              <div className="text-sm text-gray-600">{order.order_date}</div>
+                            </div>
+                            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">
+                              UNPAID
+                            </span>
                           </div>
-                          <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">
-                            UNPAID
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-red-600">
-                            ${order.amount_due.toFixed(2)}
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-red-600">
+                              ${amountDue.toFixed(2)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Calculation Breakdown */}
@@ -423,7 +582,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-700">Orders Subtotal:</span>
                       <span className="font-bold text-gray-900">
-                        ${unpaidOrders.reduce((sum, o) => sum + o.amount_due, 0).toFixed(2)}
+                        ${unpaidOrders.reduce((sum, o) => sum + (o.amount_due || 0), 0).toFixed(2)}
                       </span>
                     </div>
                     
