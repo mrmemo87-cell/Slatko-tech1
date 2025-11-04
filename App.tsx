@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardView } from './components/views/DashboardView';
-import { AllPaymentRecordsView } from './components/views/AllPaymentRecordsView';
+import { AllOrderRecordsView } from './components/views/AllOrderRecordsView';
 import { ProductsView } from './components/views/ProductsView';
 import { ClientsView } from './components/views/ClientsView';
 import { ProductionView } from './components/views/ProductionView';
@@ -232,7 +232,7 @@ const AppContent: React.FC = () => {
       case 'admin-portal':
         return <UnifiedAdminPortal />;
       case 'all-payments':
-        return <AllPaymentRecordsView {...props} />;
+        return <AllOrderRecordsView {...props} />;
       default:
         return <DashboardView t={t} />;
     }
