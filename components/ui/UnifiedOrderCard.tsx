@@ -38,7 +38,7 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
       
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
-        <div>
+        <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900">
             Order #{order.invoiceNumber}
           </h3>
@@ -46,9 +46,17 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
             {stageInfo.description}
           </p>
         </div>
-        <span className={`px-3 py-1 text-sm font-medium rounded-full ${stageInfo.color}`}>
-          {stageInfo.icon} {stageInfo.label}
-        </span>
+        <div className="flex gap-2 items-start">
+          <span className={`px-3 py-1 text-sm font-medium rounded-full ${stageInfo.color}`}>
+            {stageInfo.icon} {stageInfo.label}
+          </span>
+          {/* Payment Status Badge */}
+          {order.workflowStage === 'completed' && order.status === 'Pending' && (
+            <span className="px-3 py-1 text-sm font-bold rounded-full bg-red-600 text-white animate-pulse">
+              💰 UNPAID
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Order Details */}

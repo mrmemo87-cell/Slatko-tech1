@@ -1,0 +1,517 @@
+import React, { useState, useEffect } from 'react';
+import { paymentService, type OrderPaymentRecord } from '../../services/paymentService';
+import { supabaseApi } from '../../services/supabase-api';
+import { supabase } from '../../config/supabase';
+import { unifiedWorkflow } from '../../services/unifiedWorkflow';
+
+interface SettlementModalProps {
+  clientId: string;
+  clientName: string;
+  currentOrderId?: string;
+  onClose: () => void;
+  onComplete: () => void;
+}
+
+type SlideType = 'returns' | 'orders' | 'payment' | 'success';
+
+export const SettlementModal: React.FC<SettlementModalProps> = ({
+  clientId,
+  clientName,
+  currentOrderId,
+  onClose,
+  onComplete
+}) => {
+  const [currentSlide, setCurrentSlide] = useState<SlideType>('returns');
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  
+  // Data
+  const [lastOrder, setLastOrder] = useState<any>(null);
+  const [unpaidOrders, setUnpaidOrders] = useState<OrderPaymentRecord[]>([]);
+  const [selectedReturns, setSelectedReturns] = useState<Array<{ productId: string; productName: string; quantity: number }>>([]);
+  const [paymentDecision, setPaymentDecision] = useState<'now' | 'later' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentReference, setPaymentReference] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, [clientId]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get the last completed delivery for this client
+      const allDeliveries = await supabaseApi.getDeliveries(100);
+      const clientDeliveries = allDeliveries
+        .filter(d => d.clientId === clientId)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      if (clientDeliveries.length > 0) {
+        setLastOrder(clientDeliveries[0]);
+      }
+
+      // Get unpaid orders
+      const unpaid = await paymentService.getClientUnpaidOrders(clientId);
+      setUnpaidOrders(unpaid);
+      
+    } catch (error) {
+      console.error('Error loading settlement data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReturnSelection = (productId: string, productName: string, quantity: number, selected: boolean) => {
+    if (selected) {
+      setSelectedReturns([...selectedReturns, { productId, productName, quantity }]);
+    } else {
+      setSelectedReturns(selectedReturns.filter(r => r.productId !== productId));
+    }
+  };
+
+  const handleNextFromReturns = async () => {
+    // Save returns if any selected
+    if (selectedReturns.length > 0 && lastOrder) {
+      try {
+        setProcessing(true);
+        // Record returns in order_returns table
+        for (const returnItem of selectedReturns) {
+          await supabase
+            .from('order_returns')
+            .insert({
+              delivery_id: lastOrder.id,
+              client_id: clientId,
+              return_type: 'customer_request',
+              return_date: new Date().toISOString().split('T')[0],
+              notes: 'Returned during settlement'
+            });
+          
+          // Record return line items
+          await supabase
+            .from('return_line_items')
+            .insert({
+              delivery_id: lastOrder.id,
+              product_id: returnItem.productId,
+              quantity_returned: returnItem.quantity,
+              return_reason: 'Customer return'
+            });
+        }
+      } catch (error) {
+        console.error('Error recording returns:', error);
+      } finally {
+        setProcessing(false);
+      }
+    }
+    
+    // Move to orders slide
+    setCurrentSlide('orders');
+  };
+
+  const handlePaymentChoice = async (choice: 'now' | 'later') => {
+    setPaymentDecision(choice);
+    
+    if (choice === 'later') {
+      // Mark current order as completed but unpaid
+      if (currentOrderId) {
+        try {
+          setProcessing(true);
+          
+          // Update order status to completed with unpaid flag
+          await supabase
+            .from('deliveries')
+            .update({
+              workflow_stage: 'completed',
+              status: 'Pending', // Keep as Pending (unpaid)
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentOrderId);
+          
+          await unifiedWorkflow.loadOrders();
+          setCurrentSlide('success');
+        } catch (error) {
+          console.error('Error completing order:', error);
+        } finally {
+          setProcessing(false);
+        }
+      }
+    } else {
+      // Move to payment slide
+      setCurrentSlide('payment');
+    }
+  };
+
+  const handlePayNow = async () => {
+    try {
+      setProcessing(true);
+      
+      // Calculate total (considering returns)
+      const totalDue = unpaidOrders.reduce((sum, order) => {
+        const returnsForOrder = selectedReturns.filter(r => 
+          lastOrder && order.delivery_id === lastOrder.id
+        );
+        const returnsCredit = returnsForOrder.reduce((rSum, r) => {
+          const product = lastOrder?.items.find((i: any) => i.productId === r.productId);
+          return rSum + (product ? product.price * r.quantity : 0);
+        }, 0);
+        return sum + order.amount_due - returnsCredit;
+      }, 0);
+
+      // Create settlement session
+      const session = await paymentService.createSettlementSession({
+        delivery_id: currentOrderId || unpaidOrders[0]?.delivery_id,
+        client_id: clientId,
+        payment_type: 'full_payment',
+        amount_collected: totalDue,
+        payment_method: paymentMethod,
+        payment_reference: paymentReference || undefined,
+        orders_being_paid: unpaidOrders.map(o => o.delivery_id),
+        notes: selectedReturns.length > 0 ? `Returns processed: ${selectedReturns.length} items` : undefined
+      });
+
+      // Record payment transaction
+      await paymentService.recordPaymentTransaction({
+        client_id: clientId,
+        transaction_type: 'payment_received',
+        amount: totalDue,
+        related_delivery_id: currentOrderId || unpaidOrders[0]?.delivery_id,
+        payment_method: paymentMethod,
+        reference_number: paymentReference || undefined,
+        description: `Settlement for ${unpaidOrders.length} order(s). Session: ${session.id}`
+      });
+
+      // Update all unpaid orders to Paid
+      for (const order of unpaidOrders) {
+        await supabaseApi.updateDeliveryStatus(order.delivery_id, 'Paid');
+      }
+
+      // Mark current order as completed and paid
+      if (currentOrderId) {
+        await supabase
+          .from('deliveries')
+          .update({
+            workflow_stage: 'completed',
+            status: 'Paid',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentOrderId);
+      }
+
+      await unifiedWorkflow.loadOrders();
+      setCurrentSlide('success');
+      
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Error processing payment. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const getTotalReturnsCredit = () => {
+    if (!lastOrder) return 0;
+    return selectedReturns.reduce((sum, r) => {
+      const product = lastOrder.items.find((i: any) => i.productId === r.productId);
+      return sum + (product ? product.price * r.quantity : 0);
+    }, 0);
+  };
+
+  const getTotalDue = () => {
+    const orderTotal = unpaidOrders.reduce((sum, o) => sum + o.amount_due, 0);
+    const returnsCredit = getTotalReturnsCredit();
+    return Math.max(0, orderTotal - returnsCredit);
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 shadow-2xl">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold">💰 Settlement</h2>
+              <p className="text-blue-100 text-sm mt-1">{clientName}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Content - Slides */}
+        <div className="p-6">
+          {/* Slide 1: Returns Check */}
+          {currentSlide === 'returns' && (
+            <div className="space-y-4 animate-slideInRight">
+              <h3 className="text-lg font-bold text-gray-900">
+                Any returned items from the previous order?
+              </h3>
+              
+              {lastOrder && lastOrder.items.length > 0 ? (
+                <>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="text-sm text-blue-600 font-medium">Last Order #{lastOrder.invoiceNumber}</div>
+                    <div className="text-xs text-blue-500">{lastOrder.date}</div>
+                  </div>
+
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {lastOrder.items.map((item: any) => (
+                      <label
+                        key={item.productId}
+                        className="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-all"
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 text-blue-600 rounded"
+                          onChange={(e) => handleReturnSelection(
+                            item.productId,
+                            item.productName,
+                            item.quantity,
+                            e.target.checked
+                          )}
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{item.productName}</div>
+                          <div className="text-sm text-gray-600">Qty: {item.quantity} × ${item.price.toFixed(2)}</div>
+                        </div>
+                        <div className="font-bold text-gray-900">${(item.quantity * item.price).toFixed(2)}</div>
+                      </label>
+                    ))}
+                  </div>
+
+                  {selectedReturns.length > 0 && (
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                      <div className="text-sm font-bold text-red-700">
+                        Returns Credit: -${getTotalReturnsCredit().toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No previous order found
+                </div>
+              )}
+
+              <button
+                onClick={handleNextFromReturns}
+                disabled={processing}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+              >
+                {processing ? 'Processing...' : 'Next →'}
+              </button>
+            </div>
+          )}
+
+          {/* Slide 2: Unpaid Orders */}
+          {currentSlide === 'orders' && (
+            <div className="space-y-4 animate-slideInRight">
+              <h3 className="text-lg font-bold text-gray-900">Previous Orders</h3>
+              
+              {unpaidOrders.length > 0 ? (
+                <>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {unpaidOrders.map((order) => (
+                      <div
+                        key={order.delivery_id}
+                        className="p-4 border-2 border-red-300 bg-red-50 rounded-lg"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-bold text-gray-900">Order #{order.invoice_number}</div>
+                            <div className="text-sm text-gray-600">{order.order_date}</div>
+                          </div>
+                          <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">
+                            UNPAID
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-red-600">
+                            ${order.amount_due.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-900">Total Due:</span>
+                      <span className="text-2xl font-bold text-blue-600">${getTotalDue().toFixed(2)}</span>
+                    </div>
+                    {getTotalReturnsCredit() > 0 && (
+                      <div className="text-sm text-green-600 mt-1">
+                        (Includes -${getTotalReturnsCredit().toFixed(2)} returns credit)
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handlePaymentChoice('later')}
+                      disabled={processing}
+                      className="py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      Pay Later
+                    </button>
+                    <button
+                      onClick={() => handlePaymentChoice('now')}
+                      disabled={processing}
+                      className="py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+                    >
+                      Pay Now →
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center py-8">
+                    <div className="text-6xl mb-4">✓</div>
+                    <div className="text-gray-600">No unpaid orders</div>
+                  </div>
+                  <button
+                    onClick={() => handlePaymentChoice('later')}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all"
+                  >
+                    Complete Order
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Slide 3: Payment Method */}
+          {currentSlide === 'payment' && (
+            <div className="space-y-4 animate-slideInRight">
+              <h3 className="text-lg font-bold text-gray-900">Payment Details</h3>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-gray-900">Amount to Pay:</span>
+                  <span className="text-3xl font-bold text-blue-600">${getTotalDue().toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Payment Method</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                >
+                  <option value="cash">💵 Cash</option>
+                  <option value="card">💳 Card</option>
+                  <option value="bank_transfer">🏦 Bank Transfer</option>
+                  <option value="check">📝 Check</option>
+                </select>
+              </div>
+
+              {(paymentMethod === 'bank_transfer' || paymentMethod === 'check') && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Reference Number</label>
+                  <input
+                    type="text"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="Enter reference number"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setCurrentSlide('orders')}
+                  disabled={processing}
+                  className="py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-bold rounded-lg transition-all disabled:opacity-50"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={handlePayNow}
+                  disabled={processing}
+                  className="py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+                >
+                  {processing ? 'Processing...' : 'Complete ✓'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Slide 4: Success */}
+          {currentSlide === 'success' && (
+            <div className="text-center py-8 animate-scaleIn">
+              <div className="text-6xl mb-4">🎉</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                {paymentDecision === 'now' ? 'Payment Completed!' : 'Order Completed!'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {paymentDecision === 'now' 
+                  ? 'Settlement has been recorded successfully.'
+                  : 'Order marked as complete. Payment pending.'}
+              </p>
+              <button
+                onClick={() => {
+                  onComplete();
+                  onClose();
+                }}
+                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from {
+            transform: scale(0.9);
+            opacity: 0;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes slideInRight {
+          from {
+            transform: translateX(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+        .animate-slideInRight {
+          animation: slideInRight 0.3s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+};

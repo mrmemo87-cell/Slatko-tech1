@@ -27,6 +27,20 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     }
   }, [isOpen]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -128,7 +142,15 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.businessName || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a, b) => {
+    // Sort by last order date (most recent first)
+    if (a.lastOrderDate && b.lastOrderDate) {
+      return new Date(b.lastOrderDate).getTime() - new Date(a.lastOrderDate).getTime();
+    }
+    if (a.lastOrderDate) return -1; // a has orders, b doesn't
+    if (b.lastOrderDate) return 1;  // b has orders, a doesn't
+    return a.name.localeCompare(b.name); // Both have no orders, sort alphabetically
+  });
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -201,19 +223,46 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         autoFocus
                       />
                       <div className="grid gap-2 max-h-96 overflow-y-auto">
-                        {filteredClients.map(client => (
-                          <button
-                            key={client.id}
-                            onClick={() => handleSelectClient(client)}
-                            className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
-                          >
-                            <div className="font-semibold text-gray-900">{client.name}</div>
-                            {client.businessName && (
-                              <div className="text-sm text-gray-600">{client.businessName}</div>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">{client.phone}</div>
-                          </button>
-                        ))}
+                        {filteredClients.map((client, index) => {
+                          const lastOrderDays = client.lastOrderDate 
+                            ? Math.floor((new Date().getTime() - new Date(client.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
+                            : null;
+                          
+                          return (
+                            <button
+                              key={client.id}
+                              onClick={() => handleSelectClient(client)}
+                              className={`text-left p-4 border-2 rounded-lg transition-all duration-200 ${
+                                index < 5 && lastOrderDays !== null
+                                  ? 'border-blue-300 bg-blue-50 hover:border-blue-500 hover:bg-blue-100'
+                                  : 'border-gray-200 hover:border-blue-500 hover:bg-blue-50'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-900">{client.name}</div>
+                                  {client.businessName && (
+                                    <div className="text-sm text-gray-600">{client.businessName}</div>
+                                  )}
+                                  <div className="text-xs text-gray-500 mt-1">{client.phone}</div>
+                                </div>
+                                {lastOrderDays !== null && (
+                                  <div className="ml-2">
+                                    <div className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                      lastOrderDays <= 3 
+                                        ? 'bg-green-100 text-green-700'
+                                        : lastOrderDays <= 7 
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {lastOrderDays === 0 ? 'Today' : lastOrderDays === 1 ? 'Yesterday' : `${lastOrderDays}d ago`}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -225,6 +274,29 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         <div className="text-sm text-blue-600 font-medium">{t.clients?.selectedClient || 'Client'}</div>
                         <div className="font-bold text-gray-900">{selectedClient?.name}</div>
                       </div>
+
+                      {/* Quick Add - Most Popular Items */}
+                      {!searchTerm && cart.length === 0 && (
+                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-amber-200">
+                          <div className="text-sm font-bold text-amber-700 mb-2">⚡ Quick Add Popular</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {products.filter(p => 
+                              p.name.toLowerCase().includes('dubai') || 
+                              p.name.toLowerCase().includes('classic') ||
+                              p.name.toLowerCase().includes('cheesecake')
+                            ).slice(0, 4).map(product => (
+                              <button
+                                key={product.id}
+                                onClick={() => handleAddToCart(product)}
+                                className="p-2 bg-white border-2 border-amber-300 rounded-lg hover:bg-amber-100 transition-all"
+                              >
+                                <div className="text-sm font-semibold text-gray-900">{product.name}</div>
+                                <div className="text-xs font-bold text-amber-600">${product.price}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <input
                         type="text"
@@ -262,19 +334,55 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                               
                               {isExpanded && (
                                 <div className="p-2 space-y-2 bg-white">
-                                  {categoryProducts.map(product => (
-                                    <button
-                                      key={product.id}
-                                      onClick={() => handleAddToCart(product)}
-                                      className="w-full text-left p-3 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 flex justify-between items-center"
-                                    >
-                                      <div>
-                                        <div className="font-semibold text-gray-900">{product.name}</div>
-                                        <div className="text-sm text-gray-600">${product.price.toFixed(2)}</div>
+                                  {categoryProducts.map(product => {
+                                    const cartItem = cart.find(item => item.product.id === product.id);
+                                    const inCart = !!cartItem;
+                                    const quantity = cartItem?.quantity || 0;
+                                    
+                                    return (
+                                      <div
+                                        key={product.id}
+                                        className={`p-3 border-2 rounded-lg transition-all duration-200 ${
+                                          inCart 
+                                            ? 'border-green-500 bg-green-50' 
+                                            : 'border-gray-200 hover:border-gray-300'
+                                        }`}
+                                      >
+                                        <div className="flex justify-between items-center">
+                                          <div className="flex-1">
+                                            <div className="font-semibold text-gray-900">{product.name}</div>
+                                            <div className="text-sm font-bold text-blue-600">${product.price.toFixed(2)}</div>
+                                          </div>
+                                          
+                                          {inCart ? (
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
+                                                className="w-10 h-10 bg-red-500 text-white text-xl rounded-full hover:bg-red-600 transition-colors font-bold flex items-center justify-center"
+                                              >
+                                                −
+                                              </button>
+                                              <span className="w-12 text-center font-bold text-xl text-gray-900">{quantity}</span>
+                                              <button
+                                                onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                                                className="w-10 h-10 bg-green-500 text-white text-xl rounded-full hover:bg-green-600 transition-colors font-bold flex items-center justify-center"
+                                              >
+                                                +
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleAddToCart(product)}
+                                              className="px-6 py-2 bg-green-500 text-white text-lg font-bold rounded-full hover:bg-green-600 transition-colors flex items-center gap-2"
+                                            >
+                                              <span className="text-xl">+</span>
+                                              <span>Add</span>
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                      <div className="text-2xl text-green-600 font-bold">+</div>
-                                    </button>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -282,41 +390,30 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         })}
                       </div>
 
-                      {/* Cart */}
+                      {/* Compact Cart Summary - Sticky at bottom of products */}
                       {cart.length > 0 && (
-                        <div className="border-t-2 pt-4 mt-4">
-                          <h3 className="font-bold text-gray-900 mb-3">🛒 {t.deliveries?.cart || 'Cart'}</h3>
-                          <div className="space-y-2">
-                            {cart.map(item => (
-                              <div key={item.product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">{item.product.name}</div>
-                                  <div className="text-sm text-gray-600">${item.product.price.toFixed(2)} × {item.quantity}</div>
-                                </div>
-                                <div className="flex items-center gap-2">
+                        <div className="sticky bottom-0 bg-white border-t-2 border-blue-300 pt-4 mt-4 shadow-lg">
+                          <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-300">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-bold text-blue-800">
+                                🛒 {cart.length} {cart.length === 1 ? 'item' : 'items'}
+                              </span>
+                              <span className="text-2xl font-bold text-blue-600">${cartTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {cart.map(item => (
+                                <div key={item.product.id} className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-blue-300">
+                                  <span className="text-sm font-medium text-gray-700">{item.product.name}</span>
+                                  <span className="text-xs font-bold text-blue-600">×{item.quantity}</span>
                                   <button
-                                    onClick={() => handleUpdateQuantity(item.product.id, item.quantity - 1)}
-                                    className="w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                    onClick={() => handleUpdateQuantity(item.product.id, 0)}
+                                    className="text-red-500 hover:text-red-700 text-lg font-bold leading-none"
                                   >
-                                    -
-                                  </button>
-                                  <span className="w-8 text-center font-bold">{item.quantity}</span>
-                                  <button
-                                    onClick={() => handleUpdateQuantity(item.product.id, item.quantity + 1)}
-                                    className="w-8 h-8 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors"
-                                  >
-                                    +
+                                    ×
                                   </button>
                                 </div>
-                                <div className="ml-4 font-bold text-gray-900 w-20 text-right">
-                                  ${(item.product.price * item.quantity).toFixed(2)}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 p-4 bg-blue-50 rounded-lg border-2 border-blue-200 flex justify-between items-center">
-                            <span className="text-lg font-bold text-gray-900">{t.deliveries?.total || 'Total'}</span>
-                            <span className="text-2xl font-bold text-blue-600">${cartTotal.toFixed(2)}</span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}

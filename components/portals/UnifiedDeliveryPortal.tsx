@@ -4,6 +4,7 @@ import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
 import { ClientFinancialReport } from '../payment/ClientFinancialReport';
 import { ClientPaymentSheetView } from '../payment/ClientPaymentSheetView';
+import { SettlementModal } from '../payment/SettlementModal';
 import { showToast } from '../../utils/toast';
 
 export const UnifiedDeliveryPortal: React.FC = () => {
@@ -20,6 +21,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
   // Payment management state
   const [showPaymentManager, setShowPaymentManager] = useState(false);
   const [showClientPaymentSheet, setShowClientPaymentSheet] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<WorkflowOrder | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
@@ -126,8 +128,15 @@ export const UnifiedDeliveryPortal: React.FC = () => {
 
   const markDelivered = async (orderId: string) => {
     try {
-      console.log('📦 Marking order as delivered:', orderId);
+      console.log('📦 Opening settlement modal for order:', orderId);
       
+      // Find the order to get client information
+      const order = [...orders.allOrders].find(o => o.id === orderId);
+      if (!order) {
+        throw new Error('Order not found');
+      }
+      
+      // First mark as delivered
       if (!currentUser?.id) {
         throw new Error('Current user ID is missing');
       }
@@ -140,10 +149,9 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         `Order delivered by ${currentUser.name || 'Driver'}`
       );
       
-      // Reload data after marking delivered
-      await loadDeliveryData();
-      
-      showToast('✅ Order marked as delivered!', 'success');
+      // Open settlement modal
+      setSelectedOrderForPayment(order);
+      setShowSettlementModal(true);
       
     } catch (error) {
       console.error('❌ Error marking delivered:', error);
@@ -545,6 +553,23 @@ export const UnifiedDeliveryPortal: React.FC = () => {
           onClose={() => {
             setShowClientPaymentSheet(false);
             setSelectedClientId(null);
+          }}
+        />
+      )}
+
+      {/* Settlement Modal */}
+      {showSettlementModal && selectedOrderForPayment && (
+        <SettlementModal
+          clientId={selectedOrderForPayment.clientId}
+          clientName={selectedOrderForPayment.clientName || 'Unknown Client'}
+          currentOrderId={selectedOrderForPayment.id}
+          onClose={() => {
+            setShowSettlementModal(false);
+            setSelectedOrderForPayment(null);
+          }}
+          onComplete={() => {
+            loadDeliveryData();
+            showToast('✅ Settlement completed!', 'success');
           }}
         />
       )}
