@@ -361,7 +361,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 label: 'Payment Sheet',
                 onClick: (orderId) => {
                   const order = orders.readyForPickup.find(o => o.id === orderId);
-                  if (order) handleViewClientPaymentSheet(order.client_id);
+                  if (order) handleViewClientPaymentSheet(order.clientId);
                 },
                 variant: 'secondary',
                 icon: '📋'
@@ -387,7 +387,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
                 label: 'Payment Sheet',
                 onClick: (orderId) => {
                   const orderData = orders.myRoute.find(o => o.id === orderId);
-                  if (orderData) handleViewClientPaymentSheet(orderData.client_id);
+                  if (orderData) handleViewClientPaymentSheet(orderData.clientId);
                 },
                 variant: 'secondary',
                 icon: '📋'

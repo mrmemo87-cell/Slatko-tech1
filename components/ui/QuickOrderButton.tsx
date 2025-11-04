@@ -180,8 +180,7 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
         productId: item.product.id,
         productName: item.product.name,
         quantity: item.quantity,
-        price: item.product.price,
-        unit: item.product.unit || 'pcs'
+        price: item.product.price
       }));
 
       // Create delivery
