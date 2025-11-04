@@ -197,9 +197,7 @@ class PaymentService {
             invoice_number,
             date,
             workflow_stage,
-            status,
-            amount_due,
-            amount_paid
+            status
           )
         `)
         .eq('client_id', clientId)
