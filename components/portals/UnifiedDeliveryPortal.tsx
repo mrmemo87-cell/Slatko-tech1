@@ -446,14 +446,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
 
             {/* Actions */}
             <div className="flex space-x-2">
-              {canPickup(order) && (
-                <button
-                  onClick={() => pickupOrder(order.id)}
-                  className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  📦 Pick Up Order
-                </button>
-              )}
+              {/* Removed Pick Up Order button from "all" tab - only show in Ready for Pickup tab */}
               {canDeliver(order) && (
                 <button
                   onClick={() => markDelivered(order.id)}

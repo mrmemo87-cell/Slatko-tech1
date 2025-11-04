@@ -77,8 +77,8 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
     setStep('products');
-    // Expand all categories by default for better UX
-    setExpandedCategories(new Set(Object.keys(groupProductsByCategory(products))));
+    // Start with all categories COLLAPSED by default
+    setExpandedCategories(new Set());
   };
 
   const handleAddToCart = (product: Product) => {
@@ -143,12 +143,12 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.businessName || '').toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => {
-    // Sort by last order date (most recent first)
+    // Sort by last order date (most recent at BOTTOM - oldest first)
     if (a.lastOrderDate && b.lastOrderDate) {
-      return new Date(b.lastOrderDate).getTime() - new Date(a.lastOrderDate).getTime();
+      return new Date(a.lastOrderDate).getTime() - new Date(b.lastOrderDate).getTime();
     }
-    if (a.lastOrderDate) return -1; // a has orders, b doesn't
-    if (b.lastOrderDate) return 1;  // b has orders, a doesn't
+    if (a.lastOrderDate) return 1;  // a has orders, move down
+    if (b.lastOrderDate) return -1; // b has orders, move down
     return a.name.localeCompare(b.name); // Both have no orders, sort alphabetically
   });
 
@@ -228,12 +228,15 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                             ? Math.floor((new Date().getTime() - new Date(client.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24))
                             : null;
                           
+                          // Highlight last 5 recent clients (now at bottom)
+                          const isRecent = index >= filteredClients.length - 5 && lastOrderDays !== null;
+                          
                           return (
                             <button
                               key={client.id}
                               onClick={() => handleSelectClient(client)}
                               className={`text-left p-4 border-2 rounded-lg transition-all duration-200 ${
-                                index < 5 && lastOrderDays !== null
+                                isRecent
                                   ? 'border-blue-300 bg-blue-50 hover:border-blue-500 hover:bg-blue-100'
                                   : 'border-gray-200 hover:border-blue-500 hover:bg-blue-50'
                               }`}
@@ -390,29 +393,15 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         })}
                       </div>
 
-                      {/* Compact Cart Summary - Sticky at bottom of products */}
+                      {/* Simple Cart Summary - NOT sticky */}
                       {cart.length > 0 && (
-                        <div className="sticky bottom-0 bg-white border-t-2 border-blue-300 pt-4 mt-4 shadow-lg">
+                        <div className="bg-white border-t-2 border-blue-300 pt-4 mt-4">
                           <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-2 border-blue-300">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-bold text-blue-800">
-                                🛒 {cart.length} {cart.length === 1 ? 'item' : 'items'}
+                            <div className="flex justify-between items-center">
+                              <span className="text-lg font-bold text-blue-800">
+                                🛒 Cart Total ({cart.length} {cart.length === 1 ? 'item' : 'items'})
                               </span>
                               <span className="text-2xl font-bold text-blue-600">${cartTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {cart.map(item => (
-                                <div key={item.product.id} className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-blue-300">
-                                  <span className="text-sm font-medium text-gray-700">{item.product.name}</span>
-                                  <span className="text-xs font-bold text-blue-600">×{item.quantity}</span>
-                                  <button
-                                    onClick={() => handleUpdateQuantity(item.product.id, 0)}
-                                    className="text-red-500 hover:text-red-700 text-lg font-bold leading-none"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
                             </div>
                           </div>
                         </div>

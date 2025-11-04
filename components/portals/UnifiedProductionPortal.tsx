@@ -165,7 +165,59 @@ export const UnifiedProductionPortal: React.FC = () => {
       </div>
 
       {/* Orders Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-6">
+        
+        {/* Items Summary Table - Only for Queue Tab */}
+        {activeTab === 'queue' && orders.queue.length > 0 && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-6 shadow-md">
+            <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+              📋 Total Items to Prepare
+            </h3>
+            <div className="bg-white rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-amber-100">
+                  <tr>
+                    <th className="text-left p-3 font-bold text-amber-900">Product</th>
+                    <th className="text-right p-3 font-bold text-amber-900">Total Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    // Calculate totals
+                    const itemTotals: Record<string, number> = {};
+                    orders.queue.forEach(order => {
+                      order.items?.forEach(item => {
+                        itemTotals[item.productName] = (itemTotals[item.productName] || 0) + item.quantity;
+                      });
+                    });
+                    
+                    const totalItems = Object.values(itemTotals).reduce((sum, qty) => sum + qty, 0);
+                    
+                    return (
+                      <>
+                        {Object.entries(itemTotals)
+                          .sort(([, a], [, b]) => b - a) // Sort by quantity descending
+                          .map(([productName, quantity], index) => (
+                            <tr key={productName} className={index % 2 === 0 ? 'bg-white' : 'bg-amber-50'}>
+                              <td className="p-3 text-gray-900 font-medium">{productName}</td>
+                              <td className="p-3 text-right font-bold text-amber-700">{quantity} pcs</td>
+                            </tr>
+                          ))}
+                        <tr className="bg-gradient-to-r from-amber-200 to-orange-200 border-t-2 border-amber-300">
+                          <td className="p-3 font-bold text-amber-900">TOTAL ITEMS</td>
+                          <td className="p-3 text-right text-xl font-bold text-amber-900">{totalItems} pcs</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Orders Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         
         {/* Production Queue */}
         {activeTab === 'queue' && orders.queue.map((order) => (
@@ -210,6 +262,7 @@ export const UnifiedProductionPortal: React.FC = () => {
             className="border-l-green-500"
           />
         ))}
+        </div>
       </div>
 
       {/* Empty States */}

@@ -28,7 +28,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   // Data
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [unpaidOrders, setUnpaidOrders] = useState<OrderPaymentRecord[]>([]);
-  const [selectedReturns, setSelectedReturns] = useState<Array<{ productId: string; productName: string; quantity: number }>>([]);
+  const [selectedReturns, setSelectedReturns] = useState<Array<{ productId: string; productName: string; quantity: number; maxQuantity: number }>>([]);
   const [paymentDecision, setPaymentDecision] = useState<'now' | 'later' | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentReference, setPaymentReference] = useState('');
@@ -62,11 +62,24 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     }
   };
 
-  const handleReturnSelection = (productId: string, productName: string, quantity: number, selected: boolean) => {
-    if (selected) {
-      setSelectedReturns([...selectedReturns, { productId, productName, quantity }]);
-    } else {
-      setSelectedReturns(selectedReturns.filter(r => r.productId !== productId));
+  const handleReturnQuantityChange = (productId: string, productName: string, maxQuantity: number, delta: number) => {
+    const existing = selectedReturns.find(r => r.productId === productId);
+    
+    if (!existing && delta > 0) {
+      // Add new return
+      setSelectedReturns([...selectedReturns, { productId, productName, quantity: 1, maxQuantity }]);
+    } else if (existing) {
+      const newQuantity = existing.quantity + delta;
+      
+      if (newQuantity <= 0) {
+        // Remove return
+        setSelectedReturns(selectedReturns.filter(r => r.productId !== productId));
+      } else if (newQuantity <= maxQuantity) {
+        // Update quantity
+        setSelectedReturns(selectedReturns.map(r =>
+          r.productId === productId ? { ...r, quantity: newQuantity } : r
+        ));
+      }
     }
   };
 
@@ -268,28 +281,67 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   </div>
 
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {lastOrder.items.map((item: any) => (
-                      <label
-                        key={item.productId}
-                        className="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer transition-all"
-                      >
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 text-blue-600 rounded"
-                          onChange={(e) => handleReturnSelection(
-                            item.productId,
-                            item.productName,
-                            item.quantity,
-                            e.target.checked
-                          )}
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{item.productName}</div>
-                          <div className="text-sm text-gray-600">Qty: {item.quantity} × ${item.price.toFixed(2)}</div>
+                    {lastOrder.items.map((item: any) => {
+                      const returnItem = selectedReturns.find(r => r.productId === item.productId);
+                      const returnQuantity = returnItem?.quantity || 0;
+                      
+                      return (
+                        <div
+                          key={item.productId}
+                          className={`p-3 border-2 rounded-lg transition-all ${
+                            returnQuantity > 0 
+                              ? 'border-red-400 bg-red-50' 
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{item.productName}</div>
+                              <div className="text-sm text-gray-600">
+                                Delivered: {item.quantity} pcs × ${item.price.toFixed(2)}
+                              </div>
+                              {returnQuantity > 0 && (
+                                <div className="text-sm font-bold text-red-600 mt-1">
+                                  Returning: {returnQuantity} pcs = -${(returnQuantity * item.price).toFixed(2)}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Quantity Controls */}
+                            {item.quantity > 1 ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleReturnQuantityChange(item.productId, item.productName, item.quantity, -1)}
+                                  disabled={returnQuantity === 0}
+                                  className="w-8 h-8 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition-colors disabled:opacity-30 font-bold text-lg flex items-center justify-center"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center font-bold text-lg">{returnQuantity}</span>
+                                <button
+                                  onClick={() => handleReturnQuantityChange(item.productId, item.productName, item.quantity, 1)}
+                                  disabled={returnQuantity >= item.quantity}
+                                  className="w-8 h-8 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors disabled:opacity-30 font-bold text-lg flex items-center justify-center"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleReturnQuantityChange(item.productId, item.productName, item.quantity, returnQuantity > 0 ? -1 : 1)}
+                                className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+                                  returnQuantity > 0
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                              >
+                                {returnQuantity > 0 ? '✓ Returned' : 'Return?'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="font-bold text-gray-900">${(item.quantity * item.price).toFixed(2)}</div>
-                      </label>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {selectedReturns.length > 0 && (
@@ -347,14 +399,34 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                     ))}
                   </div>
 
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-900">Total Due:</span>
-                      <span className="text-2xl font-bold text-blue-600">${getTotalDue().toFixed(2)}</span>
+                  {/* Calculation Breakdown */}
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border-2 border-blue-300 space-y-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-700">Orders Subtotal:</span>
+                      <span className="font-bold text-gray-900">
+                        ${unpaidOrders.reduce((sum, o) => sum + o.amount_due, 0).toFixed(2)}
+                      </span>
                     </div>
+                    
                     {getTotalReturnsCredit() > 0 && (
-                      <div className="text-sm text-green-600 mt-1">
-                        (Includes -${getTotalReturnsCredit().toFixed(2)} returns credit)
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-red-600">Returns Credit:</span>
+                        <span className="font-bold text-red-600">
+                          -${getTotalReturnsCredit().toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t-2 border-blue-300 pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-gray-900">Total Due:</span>
+                        <span className="text-2xl font-bold text-blue-600">${getTotalDue().toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    {selectedReturns.length > 0 && (
+                      <div className="text-xs text-gray-600 mt-2">
+                        📦 {selectedReturns.reduce((sum, r) => sum + r.quantity, 0)} items returned from last order
                       </div>
                     )}
                   </div>
