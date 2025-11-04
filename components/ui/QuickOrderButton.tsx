@@ -90,14 +90,22 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
       setLoadingLastOrder(true);
       
       // Get last order for this client using the API to ensure proper transformation
-      const allDeliveries = await supabaseApi.getDeliveries();
+      const allDeliveries = await supabaseApi.getDeliveries(500); // Increase limit to get more deliveries
+      console.log('📦 All deliveries loaded:', allDeliveries.length);
+      console.log('🔍 Looking for client ID:', selectedClient.id);
+      
       const clientDeliveries = allDeliveries
-        .filter(d => d.clientId === selectedClient.id)
+        .filter(d => {
+          console.log('Comparing delivery clientId:', d.clientId, 'with selected client:', selectedClient.id, 'Match:', d.clientId === selectedClient.id);
+          return d.clientId === selectedClient.id;
+        })
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
+      console.log('📋 Client deliveries found:', clientDeliveries.length);
       const lastDelivery = clientDeliveries[0];
 
       if (!lastDelivery || !lastDelivery.items || lastDelivery.items.length === 0) {
+        console.warn('⚠️ No previous order:', { lastDelivery, items: lastDelivery?.items });
         showToast('No previous order found for this client', 'error');
         return;
       }
@@ -343,7 +351,7 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                       </div>
 
                       {/* Repeat Last Order Button */}
-                      {selectedClient?.lastOrderDate && cart.length === 0 && (
+                      {cart.length === 0 && (
                         <button
                           onClick={handleRepeatLastOrder}
                           disabled={loadingLastOrder}
@@ -358,9 +366,9 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                             <>
                               🔄 Repeat Last Order
                               <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded">
-                                {selectedClient.lastOrderDate 
+                                {selectedClient?.lastOrderDate 
                                   ? new Date(selectedClient.lastOrderDate).toLocaleDateString()
-                                  : ''}
+                                  : 'Try it'}
                               </span>
                             </>
                           )}

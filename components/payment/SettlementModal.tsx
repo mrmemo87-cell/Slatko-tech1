@@ -461,7 +461,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center transition-all"
+              disabled={processing}
+              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ✕
             </button>
