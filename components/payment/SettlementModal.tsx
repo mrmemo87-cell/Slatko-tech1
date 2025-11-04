@@ -334,7 +334,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       // Update orders to Paid based on mode
       if (isSrazoMode && currentOrderId) {
         // Srazo: Mark only current order as paid
-        await supabase
+        console.log('🔄 Updating current order to completed/paid:', currentOrderId);
+        const { error: updateError } = await supabase
           .from('deliveries')
           .update({
             workflow_stage: 'completed',
@@ -344,10 +345,17 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             updated_at: new Date().toISOString()
           })
           .eq('id', currentOrderId);
+        
+        if (updateError) {
+          console.error('❌ Error updating delivery:', updateError);
+          throw updateError;
+        }
+        console.log('✅ Delivery updated successfully');
       } else {
         // Regular: Update all unpaid orders to Paid
         for (const order of unpaidOrders) {
-          await supabase
+          console.log('🔄 Updating unpaid order to Paid:', order.delivery_id);
+          const { error: updateError } = await supabase
             .from('deliveries')
             .update({
               status: 'Paid',
@@ -356,11 +364,17 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               updated_at: new Date().toISOString()
             })
             .eq('id', order.delivery_id);
+          
+          if (updateError) {
+            console.error('❌ Error updating delivery:', updateError);
+            throw updateError;
+          }
         }
         
         // Also mark current order as completed and paid
         if (currentOrderId) {
-          await supabase
+          console.log('🔄 Updating current order to completed/paid:', currentOrderId);
+          const { error: updateError } = await supabase
             .from('deliveries')
             .update({
               workflow_stage: 'completed',
@@ -370,6 +384,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
               updated_at: new Date().toISOString()
             })
             .eq('id', currentOrderId);
+          
+          if (updateError) {
+            console.error('❌ Error updating delivery:', updateError);
+            throw updateError;
+          }
         }
       }
 
@@ -377,8 +396,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       setCurrentSlide('success');
       
     } catch (error) {
-      console.error('Error processing payment:', error);
-      alert('Error processing payment. Please try again.');
+      console.error('❌ Full payment error:', error);
+      const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+      console.error('Error details:', errorMsg);
+      showToast(`Payment error: ${errorMsg}`, 'error');
+      alert(`Error processing payment: ${errorMsg}`);
     } finally {
       setProcessing(false);
     }

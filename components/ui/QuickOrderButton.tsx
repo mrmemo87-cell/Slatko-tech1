@@ -89,42 +89,44 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     try {
       setLoadingLastOrder(true);
       
-      // Get last order for this client
-      const { data: lastDelivery, error } = await supabase
-        .from('deliveries')
-        .select(`
-          *,
-          delivery_items (
-            quantity,
-            product_id,
-            products (id, name, price, unit, category)
-          )
-        `)
-        .eq('client_id', selectedClient.id)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Get last order for this client using the API to ensure proper transformation
+      const allDeliveries = await supabaseApi.getDeliveries();
+      const clientDeliveries = allDeliveries
+        .filter(d => d.clientId === selectedClient.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      if (error) throw error;
+      const lastDelivery = clientDeliveries[0];
 
-      if (!lastDelivery || !lastDelivery.delivery_items || lastDelivery.delivery_items.length === 0) {
+      if (!lastDelivery || !lastDelivery.items || lastDelivery.items.length === 0) {
         showToast('No previous order found for this client', 'error');
         return;
       }
       
-      // Build cart from last order items
+      // Build cart from last order items using the properly formatted delivery data
       const newCart: Array<{ product: Product; quantity: number }> = [];
       
-      for (const item of lastDelivery.delivery_items) {
-        if (item.products) {
-          const product = products.find(p => p.id === item.product_id);
-          if (product) {
-            newCart.push({
-              product,
-              quantity: item.quantity
-            });
-          }
+      for (const item of lastDelivery.items) {
+        // Find the product in our products list by ID
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          newCart.push({
+            product,
+            quantity: item.quantity
+          });
+        } else {
+          // If product not found in local list, create a basic product object from the item data
+          // This handles cases where products array might be stale
+          newCart.push({
+            product: {
+              id: item.productId,
+              name: item.productName || 'Unknown Product',
+              price: item.price,
+              stock: 0,
+              unit: 'pcs',
+              category: 'General'
+            } as Product,
+            quantity: item.quantity
+          });
         }
       }
       

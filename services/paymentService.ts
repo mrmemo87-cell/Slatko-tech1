@@ -330,20 +330,22 @@ class PaymentService {
       const collectibleOrders = unpaidOrders.map(o => o.delivery_id);
       const totalCollectible = unpaidOrders.reduce((sum, o) => sum + o.amount_remaining, 0);
 
-      const settlementData = {
+      const settlementData: any = {
         delivery_id: options.delivery_id,
         client_id: options.client_id,
-        driver_id: options.driver_id,
-        settlement_type: 'order_delivery' as const,
-        orders_to_collect: collectibleOrders,
+        driver_id: options.driver_id || null, // Explicitly set to null if not provided
+        settlement_type: 'order_delivery',
+        orders_to_collect: collectibleOrders || [],
         total_collectible: totalCollectible,
         amount_collected: options.amount_collected || 0,
         payment_method: options.payment_method || 'cash',
-        payment_reference: options.payment_reference,
+        payment_reference: options.payment_reference || null,
         settlement_status: this.determineSettlementStatus(options),
-        notes: options.notes,
+        notes: options.notes || null,
         settlement_date: new Date().toISOString().split('T')[0]
       };
+
+      console.log('📝 Creating settlement session with data:', settlementData);
 
       const { data, error } = await supabase
         .from('settlement_sessions')
@@ -351,7 +353,12 @@ class PaymentService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Settlement insert error:', error);
+        throw error;
+      }
+
+      console.log('✅ Settlement session created:', data.id);
 
       // Process the payment if amount was collected
       if (options.amount_collected && options.amount_collected > 0) {

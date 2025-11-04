@@ -199,52 +199,65 @@ export const ClientPaymentSheetView: React.FC<ClientPaymentSheetProps> = ({
                 </div>
               ) : (
                 <div className="orders-list">
-                  {unpaid_orders.map(order => (
-                    <div key={order.id} className="order-card">
-                      <div className="order-header">
-                        <div className="order-id">Order: {order.delivery_id.slice(-8)}</div>
-                        <div className={`order-status ${order.payment_status}`}>
-                          {order.payment_status}
+                  {unpaid_orders.map(order => {
+                    const invoiceNumber = order.delivery?.invoice_number || order.invoice_number || order.delivery_id.slice(-8);
+                    const deliveryDate = order.delivery?.date || order.order_date || order.created_at;
+                    const deliveryWorkflow = order.delivery?.workflow_stage || 'unknown';
+                    const deliveryStatus = order.delivery?.status || order.payment_status;
+                    
+                    return (
+                      <div key={order.id} className="order-card">
+                        <div className="order-header">
+                          <div className="order-id">
+                            Invoice #{invoiceNumber}
+                          </div>
+                          <div className={`order-status ${order.payment_status}`}>
+                            {order.payment_status.toUpperCase()}
+                          </div>
+                        </div>
+                        <div className="order-details">
+                          <div className="detail-row">
+                            <span className="label">Delivery Date:</span>
+                            <span className="value">{new Date(deliveryDate).toLocaleDateString()}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="label">Workflow Stage:</span>
+                            <span className="value">{deliveryWorkflow.replace(/_/g, ' ').toUpperCase()}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="label">Order Total:</span>
+                            <span className="value font-semibold">{paymentService.formatCurrency(order.order_total)}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="label">Amount Paid:</span>
+                            <span className="value text-green-600">{paymentService.formatCurrency(order.amount_paid)}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span className="label">Amount Due:</span>
+                            <span className="value outstanding text-red-600 font-bold">{paymentService.formatCurrency(order.amount_remaining)}</span>
+                          </div>
+                          {order.payment_date && (
+                            <div className="detail-row">
+                              <span className="label">Last Payment:</span>
+                              <span className="value">{new Date(order.payment_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          {order.due_date && (
+                            <div className="detail-row">
+                              <span className="label">Due Date:</span>
+                              <span className="value">{new Date(order.due_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          {order.notes && (
+                            <div className="detail-row">
+                              <span className="label">Notes:</span>
+                              <span className="value">{order.notes}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="order-details">
-                        <div className="detail-row">
-                          <span className="label">Order Total:</span>
-                          <span className="value">{paymentService.formatCurrency(order.order_total)}</span>
-                        </div>
-                        <div className="detail-row">
-                          <span className="label">Amount Paid:</span>
-                          <span className="value">{paymentService.formatCurrency(order.amount_paid)}</span>
-                        </div>
-                        <div className="detail-row">
-                          <span className="label">Amount Due:</span>
-                          <span className="value outstanding">{paymentService.formatCurrency(order.amount_remaining)}</span>
-                        </div>
-                        <div className="detail-row">
-                          <span className="label">Order Date:</span>
-                          <span className="value">{new Date(order.created_at).toLocaleDateString()}</span>
-                        </div>
-                        {order.payment_date && (
-                          <div className="detail-row">
-                            <span className="label">Last Payment:</span>
-                            <span className="value">{new Date(order.payment_date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {order.due_date && (
-                          <div className="detail-row">
-                            <span className="label">Due Date:</span>
-                            <span className="value">{new Date(order.due_date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {order.notes && (
-                          <div className="detail-row">
-                            <span className="label">Notes:</span>
-                            <span className="value">{order.notes}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
