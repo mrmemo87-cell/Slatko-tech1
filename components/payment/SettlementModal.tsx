@@ -37,6 +37,15 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
   const computeOrderDue = (order: OrderPaymentRecord | null | undefined): number => {
     if (!order) return 0;
+    const deliveryMeta = order.delivery || {};
+    if (typeof deliveryMeta.amount_due === 'number') {
+      return Number(deliveryMeta.amount_due);
+    }
+    if (typeof deliveryMeta.amount_paid === 'number' && typeof order.order_total === 'number') {
+      const total = Number(order.order_total);
+      const paid = Number(deliveryMeta.amount_paid);
+      return Math.max(0, total - paid);
+    }
     if (typeof order.amount_remaining === 'number') {
       return Number(order.amount_remaining);
     }
@@ -54,6 +63,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     if (!order) return '';
     return (
       order.invoice_number ||
+      (order as any).invoiceNumber ||
       order.delivery?.invoice_number ||
       ''
     );

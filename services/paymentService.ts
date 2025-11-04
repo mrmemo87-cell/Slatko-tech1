@@ -30,6 +30,9 @@ export interface OrderPaymentRecord {
     invoice_number?: string;
     date?: string;
     workflow_stage?: string;
+    status?: string;
+    amount_due?: number;
+    amount_paid?: number;
   };
 }
 
@@ -193,7 +196,10 @@ class PaymentService {
           delivery:deliveries (
             invoice_number,
             date,
-            workflow_stage
+            workflow_stage,
+            status,
+            amount_due,
+            amount_paid
           )
         `)
         .eq('client_id', clientId)

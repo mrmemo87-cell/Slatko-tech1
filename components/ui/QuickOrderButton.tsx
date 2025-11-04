@@ -104,10 +104,10 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
-      
+
       if (!lastDelivery || !lastDelivery.delivery_items || lastDelivery.delivery_items.length === 0) {
         showToast('No previous order found for this client', 'error');
         return;
