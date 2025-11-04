@@ -725,6 +725,20 @@ BEGIN
 END;
 $$;
 
+-- Grant execute permissions for API access
+GRANT EXECUTE ON FUNCTION public.rpc_production_set_stage(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_delivery_set_stage(UUID, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_delivery_adjust_items(UUID, JSONB, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_settlement_apply_returns(UUID, NUMERIC, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_payment_choose(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_payment_upload_proof(UUID, TEXT, TEXT, NUMERIC, TEXT, BOOLEAN) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_payment_proof_approve(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_payment_proof_reject(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_order_complete(UUID) TO authenticated;
+
+-- Signal PostgREST to reload schema after installing functions
+NOTIFY pgrst, 'reload schema';
+
 -- Insert some sample data for testing
 
 -- Sample products

@@ -23,6 +23,14 @@ export interface OrderPaymentRecord {
   is_return_policy_order: boolean;
   notes?: string;
   created_at: string;
+  invoice_number?: string;
+  order_date?: string;
+  amount_due?: number;
+  delivery?: {
+    invoice_number?: string;
+    date?: string;
+    workflow_stage?: string;
+  };
 }
 
 export interface PaymentTransaction {
