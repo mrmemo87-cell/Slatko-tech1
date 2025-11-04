@@ -247,7 +247,7 @@ class PaymentService {
           created_at
         `)
         .eq('client_id', clientId)
-        .in('payment_status', ['unpaid', 'pending'])
+        .or('payment_status.eq.unpaid,payment_status.eq.pending,payment_status.is.null')
         .order('created_at', { ascending: false });
 
       if (deliveriesError) throw deliveriesError;
