@@ -485,20 +485,6 @@ class SupabaseApiService {
 
       if (itemsError) throw itemsError;
 
-      // Calculate order total from items
-      const orderTotal = deliveryData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-
-      // Update the order_payment_record with the correct order_total (trigger created it with 0)
-      const { error: paymentUpdateError } = await supabase
-        .from('order_payment_records')
-        .update({ order_total: orderTotal })
-        .eq('delivery_id', delivery.id);
-
-      if (paymentUpdateError) {
-        console.warn('Warning: Could not update order payment record total:', paymentUpdateError);
-        // Don't throw - the record exists, just with wrong amount
-      }
-
       // Update product stock
       for (const item of deliveryData.items) {
         await this.updateProductStock(item.productId, item.quantity, 'subtract');

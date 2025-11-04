@@ -170,17 +170,60 @@ class PaymentService {
 
   async getOrderPaymentRecord(deliveryId: string): Promise<OrderPaymentRecord | null> {
     try {
-      const { data, error } = await supabase
-        .from('order_payment_records')
+      // Fetch the delivery
+      const { data: delivery, error: deliveryError } = await supabase
+        .from('deliveries')
         .select('*')
-        .eq('delivery_id', deliveryId)
+        .eq('id', deliveryId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (deliveryError) {
+        if (deliveryError.code === 'PGRST116') return null;
+        throw deliveryError;
       }
 
-      return data;
+      // Get delivery items
+      const { data: items, error: itemsError } = await supabase
+        .from('delivery_items')
+        .select('quantity, price')
+        .eq('delivery_id', deliveryId);
+
+      if (itemsError) throw itemsError;
+
+      // Get payments made
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('delivery_id', deliveryId);
+
+      if (paymentsError) throw paymentsError;
+
+      // Calculate totals
+      const orderTotal = (items || []).reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const amountPaid = (payments || []).reduce((sum, payment) => sum + payment.amount, 0);
+      const amountRemaining = orderTotal - amountPaid;
+
+      let paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'waived' = 'unpaid';
+      if (amountPaid >= orderTotal) {
+        paymentStatus = amountPaid > orderTotal ? 'overpaid' : 'paid';
+      } else if (amountPaid > 0) {
+        paymentStatus = 'partial';
+      }
+
+      return {
+        id: delivery.id,
+        delivery_id: delivery.id,
+        client_id: delivery.client_id,
+        order_total: orderTotal,
+        amount_paid: amountPaid,
+        amount_remaining: amountRemaining,
+        payment_status: paymentStatus,
+        payment_method: delivery.payment_method,
+        payment_date: undefined,
+        due_date: undefined,
+        is_return_policy_order: false,
+        created_at: delivery.created_at
+      };
     } catch (error) {
       console.error('Error getting order payment record:', error);
       throw error;
@@ -189,23 +232,115 @@ class PaymentService {
 
   async getClientUnpaidOrders(clientId: string): Promise<OrderPaymentRecord[]> {
     try {
-      const { data, error } = await supabase
-        .from('order_payment_records')
+      // Fetch deliveries for this client that are not fully paid
+      const { data: deliveries, error: deliveriesError } = await supabase
+        .from('deliveries')
         .select(`
-          *,
-          delivery:deliveries (
-            invoice_number,
-            date,
-            workflow_stage,
-            status
-          )
+          id,
+          invoice_number,
+          client_id,
+          date,
+          payment_status,
+          payment_method,
+          workflow_stage,
+          status,
+          created_at
         `)
         .eq('client_id', clientId)
-        .in('payment_status', ['unpaid', 'partial'])
+        .in('payment_status', ['unpaid', 'pending'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      if (deliveriesError) throw deliveriesError;
+
+      if (!deliveries || deliveries.length === 0) {
+        return [];
+      }
+
+      // Get all delivery items for these orders
+      const deliveryIds = deliveries.map(d => d.id);
+      const { data: items, error: itemsError } = await supabase
+        .from('delivery_items')
+        .select('delivery_id, quantity, price')
+        .in('delivery_id', deliveryIds);
+
+      if (itemsError) throw itemsError;
+
+      // Get all return items for these orders
+      const { data: returns, error: returnsError } = await supabase
+        .from('return_items')
+        .select('delivery_id, quantity')
+        .in('delivery_id', deliveryIds);
+
+      if (returnsError) throw returnsError;
+
+      // Get payments made for these orders
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('delivery_id, amount')
+        .in('delivery_id', deliveryIds);
+
+      if (paymentsError) throw paymentsError;
+
+      // Group items, returns, and payments by delivery
+      const itemsByDelivery = (items || []).reduce((acc, item) => {
+        if (!acc[item.delivery_id]) acc[item.delivery_id] = [];
+        acc[item.delivery_id].push(item);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      const returnsByDelivery = (returns || []).reduce((acc, ret) => {
+        if (!acc[ret.delivery_id]) acc[ret.delivery_id] = 0;
+        acc[ret.delivery_id] += ret.quantity;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const paymentsByDelivery = (payments || []).reduce((acc, payment) => {
+        if (!acc[payment.delivery_id]) acc[payment.delivery_id] = 0;
+        acc[payment.delivery_id] += payment.amount;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Calculate order totals and payment records
+      return deliveries.map(delivery => {
+        const deliveryItems = itemsByDelivery[delivery.id] || [];
+        const orderTotal = deliveryItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+        const amountPaid = paymentsByDelivery[delivery.id] || 0;
+        const amountRemaining = orderTotal - amountPaid;
+
+        let paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'waived' = 'unpaid';
+        if (amountPaid >= orderTotal) {
+          paymentStatus = amountPaid > orderTotal ? 'overpaid' : 'paid';
+        } else if (amountPaid > 0) {
+          paymentStatus = 'partial';
+        }
+
+        return {
+          id: delivery.id,
+          delivery_id: delivery.id,
+          client_id: delivery.client_id,
+          order_total: orderTotal,
+          amount_paid: amountPaid,
+          amount_remaining: amountRemaining,
+          payment_status: paymentStatus,
+          payment_method: delivery.payment_method,
+          payment_date: undefined,
+          due_date: undefined,
+          is_return_policy_order: false,
+          notes: undefined,
+          created_at: delivery.created_at,
+          invoice_number: delivery.invoice_number?.toString(),
+          order_date: delivery.date,
+          amount_due: amountRemaining,
+          delivery: {
+            invoice_number: delivery.invoice_number?.toString(),
+            date: delivery.date,
+            workflow_stage: delivery.workflow_stage,
+            status: delivery.status,
+            amount_due: amountRemaining,
+            amount_paid: amountPaid
+          }
+        };
+      });
     } catch (error) {
       console.error('Error getting unpaid orders:', error);
       throw error;
@@ -220,49 +355,39 @@ class PaymentService {
     notes?: string
   ): Promise<void> {
     try {
-      // Get current payment record
+      // Insert payment record
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          delivery_id: deliveryId,
+          amount: amountPaid,
+          method: paymentMethod,
+          reference: reference,
+          date: new Date().toISOString().split('T')[0]
+        });
+
+      if (paymentError) throw paymentError;
+
+      // Get current order totals to update delivery payment_status
       const paymentRecord = await this.getOrderPaymentRecord(deliveryId);
       if (!paymentRecord) {
-        throw new Error('Payment record not found for order');
+        throw new Error('Could not calculate payment status for order');
       }
 
-      const newAmountPaid = paymentRecord.amount_paid + amountPaid;
-      const remaining = paymentRecord.order_total - newAmountPaid;
-      
-      let status: string = 'unpaid';
-      if (newAmountPaid >= paymentRecord.order_total) {
-        status = newAmountPaid > paymentRecord.order_total ? 'overpaid' : 'paid';
-      } else if (newAmountPaid > 0) {
-        status = 'partial';
-      }
-
-      // Update payment record
-      const { error: updateError } = await supabase
-        .from('order_payment_records')
+      // Update delivery payment status
+      const { error: deliveryError } = await supabase
+        .from('deliveries')
         .update({
-          amount_paid: newAmountPaid,
-          payment_status: status,
+          payment_status: paymentRecord.payment_status,
           payment_method: paymentMethod,
-          payment_date: new Date().toISOString().split('T')[0],
-          notes: notes || paymentRecord.notes
+          updated_at: new Date().toISOString()
         })
-        .eq('delivery_id', deliveryId);
+        .eq('id', deliveryId);
 
-      if (updateError) throw updateError;
-
-      // Record the payment transaction
-      await this.recordPaymentTransaction({
-        client_id: paymentRecord.client_id,
-        transaction_type: 'payment_received',
-        amount: amountPaid,
-        related_delivery_id: deliveryId,
-        payment_method: paymentMethod,
-        reference_number: reference,
-        description: `Payment for order ${deliveryId}${notes ? ` - ${notes}` : ''}`
-      });
+      if (deliveryError) throw deliveryError;
 
     } catch (error) {
-      console.error('Error updating order payment status:', error);
+      console.error('Error updating payment status:', error);
       throw error;
     }
   }
