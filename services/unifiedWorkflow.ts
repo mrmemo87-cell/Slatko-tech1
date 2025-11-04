@@ -3,6 +3,12 @@
 
 import { supabaseApi } from './supabase-api';
 import { supabase } from '../config/supabase';
+import {
+  deliverySetStage,
+  productionSetStage,
+  completeOrder as completeOrderRpc
+} from './orderWorkflowActions';
+import type { DeliveryStage, ProductionStage } from '../lib/types';
 
 export interface WorkflowOrder {
   id: string;
@@ -29,6 +35,20 @@ export interface WorkflowOrder {
   deliveryStartTime?: string;
   deliveryCompletedTime?: string;
 }
+
+const WORKFLOW_TO_PRODUCTION_STAGE: Record<string, ProductionStage> = {
+  order_placed: 'received',
+  production_queue: 'received',
+  in_production: 'preparing',
+  ready_for_delivery: 'ready_to_pick'
+};
+
+const WORKFLOW_TO_DELIVERY_STAGE: Record<string, DeliveryStage> = {
+  ready_for_delivery: 'ready_for_pick',
+  out_for_delivery: 'on_route',
+  delivered: 'settlement',
+  settlement: 'settlement'
+};
 
 export class UnifiedWorkflowService {
   private static instance: UnifiedWorkflowService;
@@ -140,59 +160,80 @@ export class UnifiedWorkflowService {
     metadata?: any
   ): Promise<void> {
     try {
-      // Prepare update data with automatic timestamps
-      const updateData: any = {
-        workflow_stage: newStage,
-        updated_at: new Date().toISOString()
-      };
-
-      // Auto-set timestamps based on stage transitions
+      const productionStage = WORKFLOW_TO_PRODUCTION_STAGE[newStage];
+      const deliveryStage = WORKFLOW_TO_DELIVERY_STAGE[newStage];
       const now = new Date().toISOString();
-      
+      let stageHandled = false;
+
+      if (productionStage) {
+        await productionSetStage(orderId, productionStage);
+        stageHandled = true;
+      } else if (deliveryStage) {
+        const assignIfPick = newStage === 'out_for_delivery' && !!(metadata?.driverId || metadata?.assignedDriver);
+        await deliverySetStage(orderId, deliveryStage, { assignIfPick });
+        stageHandled = true;
+      } else if (newStage === 'completed') {
+        await completeOrderRpc(orderId);
+        stageHandled = true;
+      }
+
+      const updateData: Record<string, any> = {};
+
       switch (newStage) {
         case 'in_production':
-          updateData.production_start_time = now;
           if (notes) updateData.production_notes = notes;
           break;
         case 'quality_check':
-        case 'ready_for_delivery':
+          updateData.workflow_stage = newStage;
           updateData.production_completed_time = now;
           break;
+        case 'ready_for_delivery':
+          if (!stageHandled) {
+            updateData.workflow_stage = newStage;
+          }
+          break;
         case 'out_for_delivery':
-          updateData.delivery_start_time = now;
+          if (metadata?.estimatedTime) updateData.estimated_delivery_time = metadata.estimatedTime;
           if (metadata?.driverId || metadata?.assignedDriver) {
             updateData.assigned_driver = metadata.driverId || metadata.assignedDriver;
           }
-          if (metadata?.estimatedTime) updateData.estimated_delivery_time = metadata.estimatedTime;
           break;
         case 'delivered':
           updateData.actual_delivery_time = now;
+          updateData.delivery_completed_time = now;
           if (notes) updateData.delivery_notes = notes;
           break;
+        case 'settlement':
+          if (!stageHandled) {
+            updateData.workflow_stage = newStage;
+          }
+          break;
         case 'completed':
-          updateData.delivery_completed_time = now;
+          if (!stageHandled) {
+            updateData.workflow_stage = newStage;
+          }
+          break;
+        default:
+          if (!stageHandled) {
+            updateData.workflow_stage = newStage;
+          }
           break;
       }
 
-      // Apply driver assignment if provided (support both field names for compatibility)
-      if (metadata?.driverId || metadata?.assignedDriver) {
-        updateData.assigned_driver = metadata.driverId || metadata.assignedDriver;
-      }
-
-      // Apply notes if provided
       if (notes && !updateData.production_notes && !updateData.delivery_notes) {
         updateData.notes = notes;
       }
 
-      // Update workflow stage via Supabase
-      const { error } = await supabase
-        .from('deliveries')
-        .update(updateData)
-        .eq('id', orderId);
+      if (Object.keys(updateData).length > 0) {
+        updateData.updated_at = now;
+        const { error } = await supabase
+          .from('deliveries')
+          .update(updateData)
+          .eq('id', orderId);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
-      // Reload orders to get fresh data
       await this.loadOrders();
       
     } catch (error) {

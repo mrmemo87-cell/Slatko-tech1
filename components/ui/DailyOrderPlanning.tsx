@@ -9,12 +9,14 @@ interface DailyOrderPlanningProps {
   t: any;
 }
 
+type ProductSummaryEntry = { quantity: number; product: Product };
+
 interface DayGroup {
   date: string;
   deliveries: Delivery[];
   totalOrders: number;
   totalAmount: number;
-  productSummary: Record<string, { quantity: number; product: Product }>;
+  productSummary: Record<string, ProductSummaryEntry>;
 }
 
 export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({ 
@@ -41,8 +43,8 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
   }, [deliveries, viewMode]);
 
   // Group deliveries by date
-  const dailyGroups = useMemo(() => {
-    const groups = upcomingDeliveries.reduce((acc, delivery) => {
+  const dailyGroups = useMemo<DayGroup[]>(() => {
+    const groups = upcomingDeliveries.reduce<Record<string, DayGroup>>((acc, delivery) => {
       const dateKey = delivery.date;
       if (!acc[dateKey]) {
         acc[dateKey] = {
@@ -75,9 +77,10 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
       });
       
       return acc;
-    }, {} as Record<string, DayGroup>);
+      }, {});
 
-    return Object.values(groups).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const orderedGroups = Object.values(groups) as DayGroup[];
+      return orderedGroups.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [upcomingDeliveries, products]);
 
   const getClientName = (clientId: string) => {
@@ -160,7 +163,11 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
       ) : (
         /* Daily Order Cards */
         <div className="space-y-4">
-          {dailyGroups.map((dayGroup) => (
+          {dailyGroups.map((dayGroup) => {
+            const productSummaries: ProductSummaryEntry[] = Object.values(dayGroup.productSummary);
+            const topProducts = [...productSummaries].sort((a, b) => b.quantity - a.quantity);
+
+            return (
             <div
               key={dayGroup.date}
               className={`bg-white dark:bg-slate-800 rounded-lg shadow-md border transition-all ${
@@ -217,8 +224,7 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
 
                 {/* Production Summary */}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {Object.values(dayGroup.productSummary)
-                    .sort((a, b) => b.quantity - a.quantity)
+                  {topProducts
                     .slice(0, 5)
                     .map(({ product, quantity }) => (
                       <span 
@@ -245,9 +251,7 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
                       🍰 Production Requirements
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {Object.values(dayGroup.productSummary)
-                        .sort((a, b) => b.quantity - a.quantity)
-                        .map(({ product, quantity }) => (
+                      {topProducts.map(({ product, quantity }) => (
                           <div key={product.id} className="flex justify-between items-center p-2 bg-white dark:bg-slate-800 rounded-md">
                             <span className="text-sm font-medium text-slate-800 dark:text-white">
                               {product.name}
@@ -299,7 +303,8 @@ export const DailyOrderPlanning: React.FC<DailyOrderPlanningProps> = ({
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

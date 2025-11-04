@@ -116,6 +116,14 @@ CREATE TABLE IF NOT EXISTS public.deliveries (
   estimated_delivery_time TIMESTAMP WITH TIME ZONE,
   actual_delivery_time TIMESTAMP WITH TIME ZONE,
   quality_score INTEGER CHECK (quality_score >= 1 AND quality_score <= 5),
+  payment_status VARCHAR(20) DEFAULT 'unpaid'
+    CHECK (payment_status IN ('unpaid', 'awaiting_confirmation', 'paid')),
+  payment_method VARCHAR(20)
+    CHECK (payment_method IS NULL OR payment_method IN ('SRAZU', 'LATER_CASH', 'LATER_BANK', 'cash', 'card', 'bank_transfer', 'check')),
+  delivered_summary JSONB DEFAULT '[]',
+  adjustment_reason TEXT,
+  returns_total DECIMAL(10,2) DEFAULT 0,
+  returns_note TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -279,69 +287,443 @@ ALTER TABLE public.sync_log ENABLE ROW LEVEL SECURITY;
 -- Basic RLS policies (authenticated users can access all data)
 -- In production, you'd want more granular policies based on user roles
 
+DROP POLICY IF EXISTS "Authenticated users can view all products" ON public.products;
 CREATE POLICY "Authenticated users can view all products" ON public.products
   FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can insert products" ON public.products;
 CREATE POLICY "Authenticated users can insert products" ON public.products
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update products" ON public.products;
 CREATE POLICY "Authenticated users can update products" ON public.products
   FOR UPDATE USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can view all materials" ON public.materials;
 CREATE POLICY "Authenticated users can view all materials" ON public.materials
   FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can insert materials" ON public.materials;
 CREATE POLICY "Authenticated users can insert materials" ON public.materials
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update materials" ON public.materials;
 CREATE POLICY "Authenticated users can update materials" ON public.materials
   FOR UPDATE USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can view all clients" ON public.clients;
 CREATE POLICY "Authenticated users can view all clients" ON public.clients
   FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can insert clients" ON public.clients;
 CREATE POLICY "Authenticated users can insert clients" ON public.clients
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update clients" ON public.clients;
 CREATE POLICY "Authenticated users can update clients" ON public.clients
   FOR UPDATE USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can view all deliveries" ON public.deliveries;
 CREATE POLICY "Authenticated users can view all deliveries" ON public.deliveries
   FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can insert deliveries" ON public.deliveries;
 CREATE POLICY "Authenticated users can insert deliveries" ON public.deliveries
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can update deliveries" ON public.deliveries;
 CREATE POLICY "Authenticated users can update deliveries" ON public.deliveries
   FOR UPDATE USING (auth.role() = 'authenticated');
 
 -- Apply similar policies to all other tables
+DROP POLICY IF EXISTS "Authenticated users can access delivery_items" ON public.delivery_items;
 CREATE POLICY "Authenticated users can access delivery_items" ON public.delivery_items
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access return_items" ON public.return_items;
 CREATE POLICY "Authenticated users can access return_items" ON public.return_items
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access payments" ON public.payments;
 CREATE POLICY "Authenticated users can access payments" ON public.payments
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access production_batches" ON public.production_batches;
 CREATE POLICY "Authenticated users can access production_batches" ON public.production_batches
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access production_material_costs" ON public.production_material_costs;
 CREATE POLICY "Authenticated users can access production_material_costs" ON public.production_material_costs
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access purchases" ON public.purchases;
 CREATE POLICY "Authenticated users can access purchases" ON public.purchases
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access purchase_items" ON public.purchase_items;
 CREATE POLICY "Authenticated users can access purchase_items" ON public.purchase_items
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access users" ON public.users;
 CREATE POLICY "Authenticated users can access users" ON public.users
   FOR ALL USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Authenticated users can access sync_log" ON public.sync_log;
 CREATE POLICY "Authenticated users can access sync_log" ON public.sync_log
   FOR ALL USING (auth.role() = 'authenticated');
+
+-- Payment proof storage
+CREATE TABLE IF NOT EXISTS public.order_payment_proofs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID REFERENCES public.deliveries(id) ON DELETE CASCADE,
+  file_path TEXT NOT NULL,
+  mime_type TEXT,
+  size_bytes BIGINT,
+  note TEXT,
+  status VARCHAR(20) DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected')),
+  uploaded_by UUID DEFAULT auth.uid(),
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  reviewed_by UUID,
+  reviewed_at TIMESTAMP WITH TIME ZONE,
+  review_note TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_payment_proofs_order_id ON public.order_payment_proofs(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_payment_proofs_status ON public.order_payment_proofs(status);
+
+ALTER TABLE public.order_payment_proofs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Authenticated users can access payment proofs" ON public.order_payment_proofs;
+CREATE POLICY "Authenticated users can access payment proofs" ON public.order_payment_proofs
+  FOR ALL USING (auth.role() = 'authenticated');
+
+-- RPC helper functions
+DROP FUNCTION IF EXISTS public.rpc_production_set_stage(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_production_set_stage(
+  p_order_id UUID,
+  p_stage TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+DECLARE
+  target_stage TEXT;
+BEGIN
+  IF p_stage NOT IN ('received', 'preparing', 'ready_to_pick') THEN
+    RAISE EXCEPTION 'Invalid production stage %', p_stage;
+  END IF;
+
+  target_stage := CASE p_stage
+    WHEN 'received' THEN 'production_queue'
+    WHEN 'preparing' THEN 'in_production'
+    WHEN 'ready_to_pick' THEN 'ready_for_delivery'
+  END;
+
+  UPDATE public.deliveries
+  SET workflow_stage = target_stage,
+      production_start_time = CASE
+        WHEN target_stage = 'in_production' AND production_start_time IS NULL THEN now()
+        ELSE production_start_time
+      END,
+      production_completed_time = CASE
+        WHEN target_stage = 'ready_for_delivery' THEN now()
+        ELSE production_completed_time
+      END,
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_delivery_set_stage(UUID, TEXT, BOOLEAN);
+CREATE OR REPLACE FUNCTION public.rpc_delivery_set_stage(
+  p_order_id UUID,
+  p_stage TEXT,
+  p_assign_if_pick BOOLEAN DEFAULT FALSE
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+DECLARE
+  target_stage TEXT;
+  driver_id TEXT;
+BEGIN
+  IF p_stage NOT IN ('ready_for_pick', 'on_route', 'settlement') THEN
+    RAISE EXCEPTION 'Invalid delivery stage %', p_stage;
+  END IF;
+
+  target_stage := CASE p_stage
+    WHEN 'ready_for_pick' THEN 'ready_for_delivery'
+    WHEN 'on_route' THEN 'out_for_delivery'
+    ELSE 'settlement'
+  END;
+
+  IF p_assign_if_pick THEN
+    driver_id := auth.uid()::TEXT;
+  END IF;
+
+  UPDATE public.deliveries
+  SET workflow_stage = target_stage,
+      delivery_start_time = CASE
+        WHEN target_stage = 'out_for_delivery' AND delivery_start_time IS NULL THEN now()
+        ELSE delivery_start_time
+      END,
+      delivery_completed_time = CASE
+        WHEN target_stage = 'settlement' THEN now()
+        ELSE delivery_completed_time
+      END,
+      assigned_driver = CASE
+        WHEN target_stage = 'out_for_delivery' AND driver_id IS NOT NULL THEN driver_id
+        ELSE assigned_driver
+      END,
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_delivery_adjust_items(UUID, JSONB, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_delivery_adjust_items(
+  p_order_id UUID,
+  p_delivered_items JSONB,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+BEGIN
+  IF p_delivered_items IS NULL OR jsonb_typeof(p_delivered_items) <> 'array' THEN
+    RAISE EXCEPTION 'Delivered items must be an array';
+  END IF;
+
+  UPDATE public.deliveries
+  SET delivered_summary = p_delivered_items,
+      adjustment_reason = COALESCE(p_reason, adjustment_reason),
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_settlement_apply_returns(UUID, NUMERIC, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_settlement_apply_returns(
+  p_order_id UUID,
+  p_returns NUMERIC,
+  p_note TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+BEGIN
+  UPDATE public.deliveries
+  SET returns_total = p_returns,
+      returns_note = p_note,
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_payment_choose(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_payment_choose(
+  p_order_id UUID,
+  p_method TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+DECLARE
+  target_status TEXT;
+BEGIN
+  IF p_method NOT IN ('SRAZU', 'LATER_CASH', 'LATER_BANK') THEN
+    RAISE EXCEPTION 'Invalid payment method %', p_method;
+  END IF;
+
+  target_status := CASE p_method
+    WHEN 'SRAZU' THEN 'paid'
+    ELSE 'awaiting_confirmation'
+  END;
+
+  UPDATE public.deliveries
+  SET payment_method = p_method,
+      payment_status = target_status,
+      status = CASE WHEN target_status = 'paid' THEN 'Paid' ELSE status END,
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_payment_upload_proof(UUID, TEXT, TEXT, NUMERIC, TEXT, BOOLEAN);
+CREATE OR REPLACE FUNCTION public.rpc_payment_upload_proof(
+  p_order_id UUID,
+  p_file_path TEXT,
+  p_mime TEXT DEFAULT NULL,
+  p_size NUMERIC DEFAULT NULL,
+  p_note TEXT DEFAULT NULL,
+  p_auto_approve BOOLEAN DEFAULT FALSE
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+DECLARE
+  new_id UUID;
+  reviewer UUID;
+  target_status TEXT := 'pending';
+BEGIN
+  IF p_auto_approve THEN
+    target_status := 'approved';
+    reviewer := auth.uid();
+  END IF;
+
+  INSERT INTO public.order_payment_proofs (
+    order_id,
+    file_path,
+    mime_type,
+    size_bytes,
+    note,
+    status,
+    uploaded_by,
+    reviewed_by,
+    reviewed_at,
+    review_note
+  )
+  VALUES (
+    p_order_id,
+    p_file_path,
+    p_mime,
+    CASE WHEN p_size IS NULL THEN NULL ELSE p_size::BIGINT END,
+    p_note,
+    target_status,
+    auth.uid(),
+    reviewer,
+    CASE WHEN p_auto_approve THEN now() ELSE NULL END,
+    CASE WHEN p_auto_approve THEN 'Auto-approved' ELSE NULL END
+  )
+  RETURNING id INTO new_id;
+
+  IF target_status = 'approved' THEN
+    UPDATE public.deliveries
+    SET payment_status = 'paid',
+        status = 'Paid',
+        updated_at = now()
+    WHERE id = p_order_id;
+  END IF;
+
+  RETURN new_id;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_payment_proof_approve(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_payment_proof_approve(
+  p_proof_id UUID,
+  p_review_note TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+DECLARE
+  delivery_id UUID;
+BEGIN
+  UPDATE public.order_payment_proofs
+  SET status = 'approved',
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      review_note = p_review_note
+  WHERE id = p_proof_id
+  RETURNING order_id INTO delivery_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Payment proof % not found', p_proof_id;
+  END IF;
+
+  UPDATE public.deliveries
+  SET payment_status = 'paid',
+      status = 'Paid',
+      updated_at = now()
+  WHERE id = delivery_id;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_payment_proof_reject(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.rpc_payment_proof_reject(
+  p_proof_id UUID,
+  p_review_note TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+BEGIN
+  UPDATE public.order_payment_proofs
+  SET status = 'rejected',
+      reviewed_by = auth.uid(),
+      reviewed_at = now(),
+      review_note = p_review_note
+  WHERE id = p_proof_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Payment proof % not found', p_proof_id;
+  END IF;
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.rpc_order_complete(UUID);
+CREATE OR REPLACE FUNCTION public.rpc_order_complete(
+  p_order_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO public, auth
+AS $$
+BEGIN
+  UPDATE public.deliveries
+  SET workflow_stage = 'completed',
+      delivery_completed_time = COALESCE(delivery_completed_time, now()),
+      status = CASE
+        WHEN payment_status = 'paid' THEN 'Paid'
+        ELSE 'Settled'
+      END,
+      updated_at = now()
+  WHERE id = p_order_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Delivery % not found', p_order_id;
+  END IF;
+END;
+$$;
 
 -- Insert some sample data for testing
 

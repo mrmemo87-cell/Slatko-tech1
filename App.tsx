@@ -160,6 +160,49 @@ const AppContent: React.FC = () => {
     setLang(lang === 'en' ? 'ru' : 'en');
   };
 
+  /*
+  SALES PORTAL
+  - Create order → state='created', production_stage=null, delivery_stage=null
+
+  PRODUCTION PORTAL (3 steps)
+  - received      → rpc_production_set_stage(orderId,'received')
+  - preparing     → rpc_production_set_stage(orderId,'preparing')
+  - ready_to_pick → rpc_production_set_stage(orderId,'ready_to_pick')
+                    → then Delivery portal sees it as 'ready_for_pick'
+
+  DELIVERY PORTAL (3 steps + settlement)
+  - ready_for_pick → visible to all couriers
+  - on_route       → courier taps "Pick" → rpc_delivery_set_stage(orderId,'on_route', assign=true)
+  - settlement     → rpc_delivery_set_stage(orderId,'settlement')
+
+     Inside 'on_route' or right before settlement:
+     - Adjust Delivered Items:
+         rpc_delivery_adjust_items(orderId, deliveredItems, reason?)
+         (delivered_total auto-computed)
+     - (Optional) Confirm actual delivery → move to 'settlement'
+
+  SETTLEMENT MODAL
+  Section A: Previous invoice
+  - Show previous_invoice_balance
+  - If returns exist → rpc_settlement_apply_returns(orderId, returns, note?)
+  - Result updates previous_invoice_balance and returns_deducted
+
+  Section B: Current order payment
+  - Choose method: SRAZU / LATER_CASH / LATER_BANK → rpc_payment_choose
+  - If SRAZU and paid immediately, you may also upload proof (optional)
+
+  COMPLETE
+  - rpc_order_complete(orderId)
+  - Badge color:
+     payment_status='paid'   → green
+     otherwise               → red (with Attach Proof CTA)
+
+  UNPAID → upload proof:
+  - rpc_payment_upload_proof(orderId, filePath, mime, size, note, autoApprove=true|false)
+  - If autoApprove=true → instantly Paid (green)
+  - If autoApprove=false → shows "awaiting confirmation" style, reviewer uses approve/reject RPCs
+  */
+
   const renderView = () => {
     const props = { t, showToast };
     switch (view) {

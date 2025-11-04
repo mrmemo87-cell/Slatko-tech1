@@ -159,6 +159,27 @@ export const UnifiedDeliveryPortal: React.FC = () => {
     }
   };
 
+  // Handle settlement for already delivered orders
+  const handleSettlement = async (orderId: string) => {
+    try {
+      console.log('💰 Opening settlement modal for delivered order:', orderId);
+      
+      // Find the order to get client information
+      const order = [...orders.allOrders].find(o => o.id === orderId);
+      if (!order) {
+        throw new Error('Order not found');
+      }
+      
+      // Open settlement modal (order already marked as delivered)
+      setSelectedOrderForPayment(order);
+      setShowSettlementModal(true);
+      
+    } catch (error) {
+      console.error('❌ Error opening settlement:', error);
+      showToast(`Error opening settlement: ${error.message || 'Unknown error'}`, 'error');
+    }
+  };
+
   const startSettlement = async (orderId: string) => {
     try {
       console.log('💰 Starting settlement for order:', orderId);
@@ -441,10 +462,10 @@ export const UnifiedDeliveryPortal: React.FC = () => {
               )}
               {canSettle(order) && (
                 <button
-                  onClick={() => startSettlement(order.id)}
+                  onClick={() => handleSettlement(order.id)}
                   className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-sm font-medium hover:bg-purple-700 transition-colors"
                 >
-                  💰 Start Settlement
+                  💰 Settlement
                 </button>
               )}
               {!canPickup(order) && !canDeliver(order) && !canSettle(order) && (
