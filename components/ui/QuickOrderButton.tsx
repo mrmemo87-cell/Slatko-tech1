@@ -20,6 +20,7 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [loadingLastOrder, setLoadingLastOrder] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,6 +80,67 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     setStep('products');
     // Start with all categories COLLAPSED by default
     setExpandedCategories(new Set());
+  };
+
+  const handleRepeatLastOrder = async () => {
+    if (!selectedClient) return;
+    
+    try {
+      setLoadingLastOrder(true);
+      
+      // Get last order for this client
+      const { data: lastDelivery, error } = await supabaseApi['supabase']
+        .from('deliveries')
+        .select(`
+          *,
+          delivery_items (
+            quantity,
+            product_id,
+            products (id, name, price, unit, category)
+          )
+        `)
+        .eq('client_id', selectedClient.id)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) throw error;
+      
+      if (!lastDelivery || !lastDelivery.delivery_items || lastDelivery.delivery_items.length === 0) {
+        showToast('No previous order found for this client', 'error');
+        return;
+      }
+      
+      // Build cart from last order items
+      const newCart: Array<{ product: Product; quantity: number }> = [];
+      
+      for (const item of lastDelivery.delivery_items) {
+        if (item.products) {
+          const product = products.find(p => p.id === item.product_id);
+          if (product) {
+            newCart.push({
+              product,
+              quantity: item.quantity
+            });
+          }
+        }
+      }
+      
+      if (newCart.length === 0) {
+        showToast('Could not load products from last order', 'error');
+        return;
+      }
+      
+      setCart(newCart);
+      showToast(`✅ Loaded ${newCart.length} items from last order!`, 'success');
+      
+    } catch (error) {
+      console.error('Error loading last order:', error);
+      showToast('Error loading last order', 'error');
+    } finally {
+      setLoadingLastOrder(false);
+    }
   };
 
   const handleAddToCart = (product: Product) => {

@@ -160,7 +160,9 @@ export class UnifiedWorkflowService {
           break;
         case 'out_for_delivery':
           updateData.delivery_start_time = now;
-          if (metadata?.driverId) updateData.assigned_driver = metadata.driverId;
+          if (metadata?.driverId || metadata?.assignedDriver) {
+            updateData.assigned_driver = metadata.driverId || metadata.assignedDriver;
+          }
           if (metadata?.estimatedTime) updateData.estimated_delivery_time = metadata.estimatedTime;
           break;
         case 'delivered':
@@ -172,9 +174,9 @@ export class UnifiedWorkflowService {
           break;
       }
 
-      // Apply driver assignment if provided
-      if (metadata?.driverId) {
-        updateData.assigned_driver = metadata.driverId;
+      // Apply driver assignment if provided (support both field names for compatibility)
+      if (metadata?.driverId || metadata?.assignedDriver) {
+        updateData.assigned_driver = metadata.driverId || metadata.assignedDriver;
       }
 
       // Apply notes if provided

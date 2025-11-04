@@ -111,7 +111,7 @@ export const UnifiedDeliveryPortal: React.FC = () => {
         currentUser.id,
         'delivery',
         `Order picked up by ${currentUser.name || 'Driver'}`,
-        { assignedDriver: currentUser.id, pickupTime: new Date().toISOString() }
+        { driverId: currentUser.id, pickupTime: new Date().toISOString() }
       );
       
       // Reload data after pickup
@@ -355,28 +355,12 @@ export const UnifiedDeliveryPortal: React.FC = () => {
             key={order.id}
             order={order}
             showDetails="full"
-            actions={order.workflowStage === 'out_for_delivery' ? [
+            actions={[
               {
                 label: 'Mark as Delivered',
                 onClick: markDelivered,
                 variant: 'success',
                 icon: '✅'
-              },
-              {
-                label: 'Payment Sheet',
-                onClick: (orderId) => {
-                  const orderData = orders.myRoute.find(o => o.id === orderId);
-                  if (orderData) handleViewClientPaymentSheet(orderData.client_id);
-                },
-                variant: 'secondary',
-                icon: '📋'
-              }
-            ] : [
-              {
-                label: 'Start Settlement',
-                onClick: startSettlement,
-                variant: 'primary',
-                icon: '💰'
               },
               {
                 label: 'Payment Sheet',
