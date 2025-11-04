@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseApi } from '../../services/supabase-api';
 import { unifiedWorkflow } from '../../services/unifiedWorkflow';
+import { supabase } from '../../config/supabase';
 import { Client, Product } from '../../types';
 import { groupProductsByCategory } from '../../constants/productCategories';
 
@@ -89,7 +90,7 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
       setLoadingLastOrder(true);
       
       // Get last order for this client
-      const { data: lastDelivery, error } = await supabaseApi['supabase']
+      const { data: lastDelivery, error } = await supabase
         .from('deliveries')
         .select(`
           *,
@@ -339,6 +340,31 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                         <div className="text-sm text-blue-600 font-medium">{t.clients?.selectedClient || 'Client'}</div>
                         <div className="font-bold text-gray-900">{selectedClient?.name}</div>
                       </div>
+
+                      {/* Repeat Last Order Button */}
+                      {selectedClient?.lastOrderDate && cart.length === 0 && (
+                        <button
+                          onClick={handleRepeatLastOrder}
+                          disabled={loadingLastOrder}
+                          className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                        >
+                          {loadingLastOrder ? (
+                            <>
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              🔄 Repeat Last Order
+                              <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded">
+                                {selectedClient.lastOrderDate 
+                                  ? new Date(selectedClient.lastOrderDate).toLocaleDateString()
+                                  : ''}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       {/* Quick Add - Most Popular Items */}
                       {!searchTerm && cart.length === 0 && (
