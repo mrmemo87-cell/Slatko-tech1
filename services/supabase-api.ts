@@ -463,7 +463,8 @@ class SupabaseApiService {
           client_id: deliveryData.clientId,
           date: deliveryData.date,
           notes: deliveryData.notes,
-          status: 'Pending'
+          status: 'Pending',
+          workflow_stage: 'order_placed' // Explicitly set initial workflow stage
         }])
         .select()
         .single();

@@ -2,6 +2,7 @@
 // Single source of truth for all workflow operations across all portals
 
 import { supabaseApi } from './supabase-api';
+import { supabase } from '../config/supabase';
 
 export interface WorkflowOrder {
   id: string;
@@ -139,13 +140,52 @@ export class UnifiedWorkflowService {
     metadata?: any
   ): Promise<void> {
     try {
-      // Update workflow stage directly via Supabase
-      const { error } = await supabaseApi.supabase
+      // Prepare update data with automatic timestamps
+      const updateData: any = {
+        workflow_stage: newStage,
+        updated_at: new Date().toISOString()
+      };
+
+      // Auto-set timestamps based on stage transitions
+      const now = new Date().toISOString();
+      
+      switch (newStage) {
+        case 'in_production':
+          updateData.production_start_time = now;
+          if (notes) updateData.production_notes = notes;
+          break;
+        case 'quality_check':
+        case 'ready_for_delivery':
+          updateData.production_completed_time = now;
+          break;
+        case 'out_for_delivery':
+          updateData.delivery_start_time = now;
+          if (metadata?.driverId) updateData.assigned_driver = metadata.driverId;
+          if (metadata?.estimatedTime) updateData.estimated_delivery_time = metadata.estimatedTime;
+          break;
+        case 'delivered':
+          updateData.actual_delivery_time = now;
+          if (notes) updateData.delivery_notes = notes;
+          break;
+        case 'completed':
+          updateData.delivery_completed_time = now;
+          break;
+      }
+
+      // Apply driver assignment if provided
+      if (metadata?.driverId) {
+        updateData.assigned_driver = metadata.driverId;
+      }
+
+      // Apply notes if provided
+      if (notes && !updateData.production_notes && !updateData.delivery_notes) {
+        updateData.notes = notes;
+      }
+
+      // Update workflow stage via Supabase
+      const { error } = await supabase
         .from('deliveries')
-        .update({
-          workflow_stage: newStage,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
@@ -157,6 +197,104 @@ export class UnifiedWorkflowService {
       console.error('❌ Error updating order stage:', error);
       throw error;
     }
+  }
+
+  // Assign driver to order
+  async assignDriver(orderId: string, driverId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('deliveries')
+        .update({
+          assigned_driver: driverId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      await this.loadOrders();
+    } catch (error) {
+      console.error('❌ Error assigning driver:', error);
+      throw error;
+    }
+  }
+
+  // Update production notes
+  async updateProductionNotes(orderId: string, notes: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('deliveries')
+        .update({
+          production_notes: notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      await this.loadOrders();
+    } catch (error) {
+      console.error('❌ Error updating production notes:', error);
+      throw error;
+    }
+  }
+
+  // Update delivery notes
+  async updateDeliveryNotes(orderId: string, notes: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('deliveries')
+        .update({
+          delivery_notes: notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      await this.loadOrders();
+    } catch (error) {
+      console.error('❌ Error updating delivery notes:', error);
+      throw error;
+    }
+  }
+
+  // Get valid next stages for a given stage (workflow progression rules)
+  getValidNextStages(currentStage: string): string[] {
+    const progressionMap: Record<string, string[]> = {
+      'order_placed': ['production_queue', 'completed'], // Can skip or start production
+      'production_queue': ['in_production', 'order_placed'], // Start cooking or revert
+      'in_production': ['quality_check', 'production_queue'], // Move to QC or back to queue
+      'quality_check': ['ready_for_delivery', 'in_production'], // Pass QC or back to production
+      'ready_for_delivery': ['out_for_delivery', 'quality_check'], // Driver picks up or back to QC
+      'out_for_delivery': ['delivered', 'ready_for_delivery'], // Delivered or return to ready
+      'delivered': ['settlement', 'completed'], // Payment or complete
+      'settlement': ['completed'], // Final stage
+      'completed': [] // Terminal stage
+    };
+
+    return progressionMap[currentStage] || [];
+  }
+
+  // Check if a stage transition is valid
+  isValidTransition(fromStage: string, toStage: string): boolean {
+    const validNextStages = this.getValidNextStages(fromStage);
+    return validNextStages.includes(toStage);
+  }
+
+  // Get workflow statistics
+  getWorkflowStats(): {
+    total: number;
+    byStage: Record<string, number>;
+    averageCompletionTime?: number;
+  } {
+    const byStage: Record<string, number> = {};
+    
+    this.orders.forEach(order => {
+      byStage[order.workflowStage] = (byStage[order.workflowStage] || 0) + 1;
+    });
+
+    return {
+      total: this.orders.length,
+      byStage
+    };
   }
 
   // Subscribe to order updates
@@ -202,6 +340,12 @@ export class UnifiedWorkflowService {
         color: 'bg-orange-100 text-orange-800 border-orange-200',
         icon: '👨‍🍳',
         description: 'Currently being prepared'
+      },
+      'quality_check': {
+        label: 'Quality Check',
+        color: 'bg-teal-100 text-teal-800 border-teal-200',
+        icon: '🔍',
+        description: 'Final quality inspection'
       },
       'ready_for_delivery': {
         label: 'Ready for Pickup',
