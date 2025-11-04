@@ -3,6 +3,7 @@ import { paymentService, type OrderPaymentRecord } from '../../services/paymentS
 import { supabaseApi } from '../../services/supabase-api';
 import { supabase } from '../../config/supabase';
 import { unifiedWorkflow } from '../../services/unifiedWorkflow';
+import { showToast } from '../../utils/toast';
 
 interface SettlementModalProps {
   clientId: string;
@@ -88,30 +89,46 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     if (selectedReturns.length > 0 && lastOrder) {
       try {
         setProcessing(true);
-        // Record returns in order_returns table
-        for (const returnItem of selectedReturns) {
-          await supabase
-            .from('order_returns')
-            .insert({
-              delivery_id: lastOrder.id,
-              client_id: clientId,
-              return_type: 'customer_request',
-              return_date: new Date().toISOString().split('T')[0],
-              notes: 'Returned during settlement'
-            });
+        
+        // First create the order_returns record
+        const { data: orderReturn, error: returnError } = await supabase
+          .from('order_returns')
+          .insert({
+            delivery_id: lastOrder.id,
+            client_id: clientId,
+            return_type: 'customer_request',
+            return_date: new Date().toISOString().split('T')[0],
+            notes: 'Returned during settlement'
+          })
+          .select()
+          .single();
+        
+        if (returnError) throw returnError;
+        
+        // Then create return_line_items for each returned item
+        const returnLineItems = selectedReturns.map(returnItem => {
+          const product = lastOrder.items.find((i: any) => i.productId === returnItem.productId);
+          const unitPrice = product?.price || 0;
           
-          // Record return line items
-          await supabase
-            .from('return_line_items')
-            .insert({
-              delivery_id: lastOrder.id,
-              product_id: returnItem.productId,
-              quantity_returned: returnItem.quantity,
-              return_reason: 'Customer return'
-            });
-        }
+          return {
+            return_id: orderReturn.id,
+            product_name: returnItem.productName,
+            quantity_returned: returnItem.quantity,
+            unit_price: unitPrice,
+            restockable: true,
+            notes: 'Customer return during settlement'
+          };
+        });
+        
+        const { error: lineItemsError } = await supabase
+          .from('return_line_items')
+          .insert(returnLineItems);
+        
+        if (lineItemsError) throw lineItemsError;
+        
       } catch (error) {
         console.error('Error recording returns:', error);
+        showToast('Error recording returns. Continuing with settlement...', 'error');
       } finally {
         setProcessing(false);
       }
@@ -225,7 +242,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     if (!lastOrder) return 0;
     return selectedReturns.reduce((sum, r) => {
       const product = lastOrder.items.find((i: any) => i.productId === r.productId);
-      return sum + (product ? product.price * r.quantity : 0);
+      const price = product?.price || 0;
+      return sum + (price * r.quantity);
     }, 0);
   };
 
@@ -284,6 +302,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                     {lastOrder.items.map((item: any) => {
                       const returnItem = selectedReturns.find(r => r.productId === item.productId);
                       const returnQuantity = returnItem?.quantity || 0;
+                      const itemPrice = item.price || 0;
                       
                       return (
                         <div
@@ -298,11 +317,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                             <div className="flex-1">
                               <div className="font-medium text-gray-900">{item.productName}</div>
                               <div className="text-sm text-gray-600">
-                                Delivered: {item.quantity} pcs × ${item.price.toFixed(2)}
+                                Delivered: {item.quantity} pcs × ${itemPrice.toFixed(2)}
                               </div>
                               {returnQuantity > 0 && (
                                 <div className="text-sm font-bold text-red-600 mt-1">
-                                  Returning: {returnQuantity} pcs = -${(returnQuantity * item.price).toFixed(2)}
+                                  Returning: {returnQuantity} pcs = -${(returnQuantity * itemPrice).toFixed(2)}
                                 </div>
                               )}
                             </div>
