@@ -496,6 +496,93 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                       )}
                     </div>
                   )}
+
+                  {/* Step 3: Confirm Order */}
+                  {step === 'confirm' && (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                        <div className="text-sm text-blue-600 font-medium">{t.clients?.selectedClient || 'Client'}</div>
+                        <div className="font-bold text-gray-900">{selectedClient?.name}</div>
+                      </div>
+
+                      <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-300">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">📋 Review Order</h3>
+                        <p className="text-sm text-gray-600">
+                          Review and adjust quantities before creating the order
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {cart.map((item) => {
+                          const itemTotal = item.product.price * item.quantity;
+                          
+                          return (
+                            <div
+                              key={item.product.id}
+                              className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-all bg-white"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">{item.product.name}</div>
+                                  <div className="text-sm text-gray-600">
+                                    ${item.product.price.toFixed(2)} per {item.product.unit || 'pcs'}
+                                  </div>
+                                </div>
+                                
+                                {/* Quantity Controls */}
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1">
+                                    <button
+                                      onClick={() => handleUpdateQuantity(item.product.id, item.quantity - 1)}
+                                      className="w-8 h-8 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors font-bold text-lg flex items-center justify-center"
+                                    >
+                                      −
+                                    </button>
+                                    <span className="w-12 text-center font-bold text-lg">{item.quantity}</span>
+                                    <button
+                                      onClick={() => handleUpdateQuantity(item.product.id, item.quantity + 1)}
+                                      className="w-8 h-8 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors font-bold text-lg flex items-center justify-center"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="text-right min-w-[80px]">
+                                    <div className="font-bold text-gray-900">${itemTotal.toFixed(2)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Order Total */}
+                      {cart.length > 0 && (
+                        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border-2 border-green-300 space-y-2">
+                          <div className="flex justify-between items-center text-sm text-gray-700">
+                            <span>Total Items:</span>
+                            <span className="font-bold">{cart.reduce((sum, item) => sum + item.quantity, 0)} pcs</span>
+                          </div>
+                          <div className="border-t-2 border-green-300 pt-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-gray-900 text-lg">Order Total:</span>
+                              <span className="text-3xl font-bold text-green-600">
+                                ${cartTotal.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {cart.length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <div className="text-4xl mb-2">🛒</div>
+                          <p>Cart is empty</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -515,19 +602,35 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
               )}
               {step === 'products' && cart.length > 0 && (
                 <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setStep('confirm')}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-bold transition-all duration-200"
                 >
-                  {submitting ? (
-                    <span className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      {t.common?.creating || 'Creating...'}
-                    </span>
-                  ) : (
-                    `✓ ${t.deliveries?.createOrder || 'Create Order'}`
-                  )}
+                  {t.deliveries?.reviewOrder || 'Review Order'} →
                 </button>
+              )}
+              {step === 'confirm' && (
+                <>
+                  <button
+                    onClick={() => setStep('products')}
+                    className="px-6 py-3 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    ← {t.common?.back || 'Back'}
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || cart.length === 0}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? (
+                      <span className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        {t.common?.creating || 'Creating...'}
+                      </span>
+                    ) : (
+                      `✓ ${t.deliveries?.createOrder || 'Create Order'}`
+                    )}
+                  </button>
+                </>
               )}
             </div>
           </div>
