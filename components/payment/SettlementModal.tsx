@@ -392,8 +392,17 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         }
       }
 
-      await unifiedWorkflow.loadOrders();
+      // Show success first, then reload orders in background
       setCurrentSlide('success');
+      
+      // Reload orders after a short delay to ensure updates are persisted
+      setTimeout(async () => {
+        try {
+          await unifiedWorkflow.loadOrders();
+        } catch (error) {
+          console.warn('Warning: Could not reload orders after payment:', error);
+        }
+      }, 1000);
       
     } catch (error) {
       console.error('❌ Full payment error:', error);
