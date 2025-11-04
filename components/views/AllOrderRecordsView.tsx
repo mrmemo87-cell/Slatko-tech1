@@ -39,17 +39,23 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
 
       if (deliveriesError) throw deliveriesError;
 
-      // Fetch all delivery items
-      const { data: items, error: itemsError} = await supabase
+      // Fetch all delivery items with product names
+      const { data: items, error: itemsError } = await supabase
         .from('delivery_items')
-        .select('*');
+        .select(`
+          *,
+          product:products(name)
+        `);
 
       if (itemsError) throw itemsError;
 
-      // Fetch all return items
+      // Fetch all return items with product names
       const { data: returns, error: returnsError } = await supabase
         .from('return_items')
-        .select('*');
+        .select(`
+          *,
+          product:products(name)
+        `);
 
       if (returnsError) throw returnsError;
 
@@ -287,14 +293,14 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
                           </thead>
                           <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                             {order.items?.map((item, idx) => {
-                              const returned = order.returns?.find((r: any) => r.product_id === item.product_id)?.returned_quantity || 0;
-                              const sold = item.delivered_quantity - returned;
+                              const returned = order.returns?.find((r: any) => r.product_id === item.product_id)?.quantity || 0;
+                              const sold = item.quantity - returned;
                               const itemTotal = sold * item.price;
                               
                               return (
                                 <tr key={idx}>
-                                  <td className="px-3 py-2 text-sm text-slate-900 dark:text-white">{item.product_name}</td>
-                                  <td className="px-3 py-2 text-sm text-right text-slate-900 dark:text-white">{item.delivered_quantity}</td>
+                                  <td className="px-3 py-2 text-sm text-slate-900 dark:text-white">{item.product?.name || 'Unknown Product'}</td>
+                                  <td className="px-3 py-2 text-sm text-right text-slate-900 dark:text-white">{item.quantity}</td>
                                   <td className="px-3 py-2 text-sm text-right text-red-600 dark:text-red-400">{returned}</td>
                                   <td className="px-3 py-2 text-sm text-right text-green-600 dark:text-green-400">{sold}</td>
                                   <td className="px-3 py-2 text-sm text-right text-slate-900 dark:text-white">${item.price.toFixed(2)}</td>
