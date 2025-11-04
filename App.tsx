@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardView } from './components/views/DashboardView';
+import { AllPaymentRecordsView } from './components/views/AllPaymentRecordsView';
 import { ProductsView } from './components/views/ProductsView';
 import { ClientsView } from './components/views/ClientsView';
 import { ProductionView } from './components/views/ProductionView';
@@ -26,7 +27,7 @@ import { ToastContainer } from './components/ui/Toast';
 import { Toast } from './types';
 import { generateId } from './utils';
 
-type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'reports' | 'materials' | 'purchases' | 'import' | 'production-portal' | 'delivery-portal' | 'admin-portal';
+type View = 'dashboard' | 'products' | 'clients' | 'production' | 'inventory' | 'reports' | 'materials' | 'purchases' | 'import' | 'production-portal' | 'delivery-portal' | 'admin-portal' | 'all-payments';
 
 const AppContent: React.FC = () => {
   const { user, loading, signOut } = useAuth();
@@ -230,6 +231,8 @@ const AppContent: React.FC = () => {
         return <UnifiedDeliveryPortal />;
       case 'admin-portal':
         return <UnifiedAdminPortal />;
+      case 'all-payments':
+        return <AllPaymentRecordsView {...props} />;
       default:
         return <DashboardView t={t} />;
     }
@@ -334,6 +337,7 @@ const AppContent: React.FC = () => {
             )}
               <MenuItem icon={<ReportsIcon />} label={t.navigation.reports} id="reports" />
               <MenuItem icon={<ImportIcon />} label="Import Data" id="import" />
+              <MenuItem icon={<DeliveriesIcon />} label={t.navigation.allPayments} id="all-payments" />
             </nav>
 
             {/* Workflow Portals Section */}
