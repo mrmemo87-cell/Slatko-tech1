@@ -43,6 +43,8 @@ export const ClientFinancialReport: React.FC<ClientFinancialReportProps> = ({
     try {
       setLoading(true);
       
+      console.log('📊 Loading financial data for client:', clientId);
+      
       const [
         balanceData,
         unpaidData,
@@ -50,12 +52,34 @@ export const ClientFinancialReport: React.FC<ClientFinancialReportProps> = ({
         settlementsData,
         policyData
       ] = await Promise.all([
-        paymentService.getClientBalance(clientId),
-        paymentService.getClientUnpaidOrders(clientId),
-        paymentService.getClientPaymentHistory(clientId, 50),
-        paymentService.getClientSettlementHistory(clientId, 20),
-        paymentService.getClientReturnPolicy(clientId)
+        paymentService.getClientBalance(clientId).catch(err => {
+          console.error('❌ Error loading balance:', err);
+          return null;
+        }),
+        paymentService.getClientUnpaidOrders(clientId).catch(err => {
+          console.error('❌ Error loading unpaid orders:', err);
+          return [];
+        }),
+        paymentService.getClientPaymentHistory(clientId, 50).catch(err => {
+          console.error('❌ Error loading payment history:', err);
+          return [];
+        }),
+        paymentService.getClientSettlementHistory(clientId, 20).catch(err => {
+          console.error('❌ Error loading settlement history:', err);
+          return [];
+        }),
+        paymentService.getClientReturnPolicy(clientId).catch(err => {
+          console.error('❌ Error loading return policy:', err);
+          return null;
+        })
       ]);
+
+      console.log('✅ Data loaded:', {
+        balance: balanceData,
+        unpaidOrders: unpaidData.length,
+        payments: paymentsData.length,
+        settlements: settlementsData.length
+      });
 
       setBalance(balanceData);
       setUnpaidOrders(unpaidData);
@@ -78,7 +102,7 @@ export const ClientFinancialReport: React.FC<ClientFinancialReportProps> = ({
       setOrderReturns(returnsMap);
       
     } catch (error) {
-      console.error('Error loading client financial data:', error);
+      console.error('❌ Error loading client financial data:', error);
     } finally {
       setLoading(false);
     }

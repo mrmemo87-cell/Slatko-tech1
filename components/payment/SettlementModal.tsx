@@ -45,10 +45,16 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       
       // Get the current order being delivered
       if (currentOrderId) {
+        console.log('🔍 Loading current order:', currentOrderId);
         const allDeliveries = await supabaseApi.getDeliveries(100);
         const current = allDeliveries.find(d => d.id === currentOrderId);
+        
         if (current) {
+          console.log('✅ Current order loaded:', current);
+          console.log('📦 Items in current order:', current.items);
           setCurrentOrder(current);
+        } else {
+          console.warn('⚠️ Current order not found:', currentOrderId);
         }
       }
       
@@ -59,11 +65,13 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       if (clientDeliveries.length > 0) {
+        console.log('📋 Last order loaded:', clientDeliveries[0]);
         setLastOrder(clientDeliveries[0]);
       }
 
       // Get unpaid orders
       const unpaid = await paymentService.getClientUnpaidOrders(clientId);
+      console.log('💰 Unpaid orders:', unpaid);
       setUnpaidOrders(unpaid);
       
     } catch (error) {
@@ -115,6 +123,9 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       try {
         setProcessing(true);
         
+        console.log('🔄 Recording returns for order:', lastOrder.id);
+        console.log('📦 Returns to record:', selectedReturns);
+        
         // First create the order_returns record
         const { data: orderReturn, error: returnError } = await supabase
           .from('order_returns')
@@ -128,7 +139,12 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           .select()
           .single();
         
-        if (returnError) throw returnError;
+        if (returnError) {
+          console.error('❌ Error creating order_returns:', returnError);
+          throw returnError;
+        }
+        
+        console.log('✅ Order return created:', orderReturn);
         
         // Then create return_line_items for each returned item
         const returnLineItems = selectedReturns.map(returnItem => {
@@ -145,14 +161,21 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           };
         });
         
+        console.log('📦 Inserting return line items:', returnLineItems);
+        
         const { error: lineItemsError } = await supabase
           .from('return_line_items')
           .insert(returnLineItems);
         
-        if (lineItemsError) throw lineItemsError;
+        if (lineItemsError) {
+          console.error('❌ Error creating return_line_items:', lineItemsError);
+          throw lineItemsError;
+        }
+        
+        console.log('✅ Returns recorded successfully');
         
       } catch (error) {
-        console.error('Error recording returns:', error);
+        console.error('❌ Error recording returns:', error);
         showToast('Error recording returns. Continuing with settlement...', 'error');
       } finally {
         setProcessing(false);
@@ -200,17 +223,40 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     try {
       setProcessing(true);
       
-      // Calculate total (considering returns)
-      const totalDue = unpaidOrders.reduce((sum, order) => {
-        const returnsForOrder = selectedReturns.filter(r => 
-          lastOrder && order.delivery_id === lastOrder.id
-        );
-        const returnsCredit = returnsForOrder.reduce((rSum, r) => {
-          const product = lastOrder?.items.find((i: any) => i.productId === r.productId);
-          return rSum + (product ? product.price * r.quantity : 0);
+      // Determine if this is Srazo mode (paying current order only) or regular settlement
+      const isSrazoMode = unpaidOrders.length === 0 && currentOrderId;
+      
+      let totalDue = 0;
+      let ordersToPay: string[] = [];
+      
+      if (isSrazoMode) {
+        // Srazo Mode: Pay only current order
+        if (currentOrder && currentOrder.items) {
+          totalDue = currentOrder.items.reduce((sum: number, item: any) => 
+            sum + (item.quantity * (item.price || 0)), 0
+          );
+          totalDue -= getTotalReturnsCredit(); // Apply returns credit
+          ordersToPay = [currentOrderId!];
+        }
+      } else {
+        // Regular Mode: Pay all unpaid orders
+        totalDue = unpaidOrders.reduce((sum, order) => {
+          const returnsForOrder = selectedReturns.filter(r => 
+            lastOrder && order.delivery_id === lastOrder.id
+          );
+          const returnsCredit = returnsForOrder.reduce((rSum, r) => {
+            const product = lastOrder?.items.find((i: any) => i.productId === r.productId);
+            const price = product?.price || 0;
+            return rSum + (price * r.quantity);
+          }, 0);
+          return sum + (order.amount_due || 0) - returnsCredit;
         }, 0);
-        return sum + order.amount_due - returnsCredit;
-      }, 0);
+        ordersToPay = unpaidOrders.map(o => o.delivery_id);
+      }
+
+      console.log('💰 Payment mode:', isSrazoMode ? 'Srazo (Current Order Only)' : 'Regular (All Unpaid)');
+      console.log('💵 Total to pay:', totalDue);
+      console.log('📦 Orders being paid:', ordersToPay);
 
       // Create settlement session
       const session = await paymentService.createSettlementSession({
@@ -220,8 +266,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         amount_collected: totalDue,
         payment_method: paymentMethod,
         payment_reference: paymentReference || undefined,
-        orders_being_paid: unpaidOrders.map(o => o.delivery_id),
-        notes: selectedReturns.length > 0 ? `Returns processed: ${selectedReturns.length} items` : undefined
+        orders_being_paid: ordersToPay,
+        notes: isSrazoMode 
+          ? `Srazo payment for current order${selectedReturns.length > 0 ? '. Returns processed: ' + selectedReturns.length + ' items' : ''}`
+          : `Settlement for ${unpaidOrders.length} order(s)${selectedReturns.length > 0 ? '. Returns processed: ' + selectedReturns.length + ' items' : ''}`
       });
 
       // Record payment transaction
@@ -232,16 +280,14 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         related_delivery_id: currentOrderId || unpaidOrders[0]?.delivery_id,
         payment_method: paymentMethod,
         reference_number: paymentReference || undefined,
-        description: `Settlement for ${unpaidOrders.length} order(s). Session: ${session.id}`
+        description: isSrazoMode 
+          ? `Srazo payment for order. Session: ${session.id}`
+          : `Settlement for ${unpaidOrders.length} order(s). Session: ${session.id}`
       });
 
-      // Update all unpaid orders to Paid
-      for (const order of unpaidOrders) {
-        await supabaseApi.updateDeliveryStatus(order.delivery_id, 'Paid');
-      }
-
-      // Mark current order as completed and paid
-      if (currentOrderId) {
+      // Update orders to Paid based on mode
+      if (isSrazoMode && currentOrderId) {
+        // Srazo: Mark only current order as paid
         await supabase
           .from('deliveries')
           .update({
@@ -250,6 +296,23 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
             updated_at: new Date().toISOString()
           })
           .eq('id', currentOrderId);
+      } else {
+        // Regular: Update all unpaid orders to Paid
+        for (const order of unpaidOrders) {
+          await supabaseApi.updateDeliveryStatus(order.delivery_id, 'Paid');
+        }
+        
+        // Also mark current order as completed and paid
+        if (currentOrderId) {
+          await supabase
+            .from('deliveries')
+            .update({
+              workflow_stage: 'completed',
+              status: 'Paid',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentOrderId);
+        }
       }
 
       await unifiedWorkflow.loadOrders();
@@ -273,9 +336,22 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   };
 
   const getTotalDue = () => {
-    const orderTotal = unpaidOrders.reduce((sum, o) => sum + (o.amount_due || 0), 0);
-    const returnsCredit = getTotalReturnsCredit();
-    return Math.max(0, orderTotal - returnsCredit);
+    // Check if Srazo mode (no unpaid orders, paying current order only)
+    const isSrazoMode = unpaidOrders.length === 0 && currentOrder;
+    
+    if (isSrazoMode && currentOrder?.items) {
+      // Srazo: Calculate current order total minus returns
+      const currentOrderTotal = currentOrder.items.reduce((sum: number, item: any) => 
+        sum + (item.quantity * (item.price || 0)), 0
+      );
+      const returnsCredit = getTotalReturnsCredit();
+      return Math.max(0, currentOrderTotal - returnsCredit);
+    } else {
+      // Regular: All unpaid orders minus returns
+      const orderTotal = unpaidOrders.reduce((sum, o) => sum + (o.amount_due || 0), 0);
+      const returnsCredit = getTotalReturnsCredit();
+      return Math.max(0, orderTotal - returnsCredit);
+    }
   };
 
   if (loading) {
@@ -290,9 +366,9 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-scaleIn">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex-shrink-0">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-bold">💰 Settlement</h2>
@@ -307,8 +383,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           </div>
         </div>
 
-        {/* Content - Slides */}
-        <div className="p-6">
+        {/* Content - Slides - SCROLLABLE */}
+        <div className="p-6 overflow-y-auto flex-1">
           {/* Slide 1: Returns Check */}
           {currentSlide === 'returns' && (
             <div className="space-y-4 animate-slideInRight">
@@ -546,6 +622,35 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           {currentSlide === 'orders' && (
             <div className="space-y-4 animate-slideInRight">
               <h3 className="text-lg font-bold text-gray-900">Previous Orders</h3>
+              
+              {/* Quick Payment Option for Srazo Clients */}
+              {unpaidOrders.length === 0 && currentOrderId && (
+                <div className="bg-green-50 p-4 rounded-lg border-2 border-green-300 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⚡</span>
+                    <div>
+                      <div className="font-bold text-green-900">Quick Payment (Srazo)</div>
+                      <div className="text-sm text-green-700">Pay for this order only, right now</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Skip to payment immediately for current order only
+                      setPaymentDecision('now');
+                      setCurrentSlide('payment');
+                    }}
+                    className="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-lg transition-all shadow-lg"
+                  >
+                    💵 Pay Current Order Now
+                  </button>
+                  <button
+                    onClick={() => handlePaymentChoice('later')}
+                    className="w-full py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-all"
+                  >
+                    Complete Without Payment
+                  </button>
+                </div>
+              )}
               
               {unpaidOrders.length > 0 ? (
                 <>
