@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DashboardView } from './components/views/DashboardView';
 import { AllOrderRecordsView } from './components/views/AllOrderRecordsView';
 import { ProductsView } from './components/views/ProductsView';
@@ -238,30 +238,58 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const MenuItem = ({ icon, label, id }: { icon: React.ReactElement, label: string, id: View }) => (
-    <button
-      onClick={() => {
-        setView(id);
-        if (window.innerWidth < 1024) setIsMenuOpen(false); // Close on mobile
-      }}
-      onTouchStart={() => {
-        // Ensure touch taps trigger the same navigation on mobile devices
+  const MenuItem = ({ icon, label, id }: { icon: React.ReactElement, label: string, id: View }) => {
+    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+    const touchMovedRef = useRef(false);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      touchStartRef.current = { x: t.clientX, y: t.clientY };
+      touchMovedRef.current = false;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      const s = touchStartRef.current;
+      if (s) {
+        if (Math.abs(t.clientY - s.y) > 10 || Math.abs(t.clientX - s.x) > 10) {
+          touchMovedRef.current = true;
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      // If the finger didn't move much, treat as a tap
+      if (!touchMovedRef.current) {
         setView(id);
         if (window.innerWidth < 1024) setIsMenuOpen(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+      }
+      touchStartRef.current = null;
+      touchMovedRef.current = false;
+    };
+
+    return (
+      <button
+        onClick={() => {
           setView(id);
-          if (window.innerWidth < 1024) setIsMenuOpen(false);
-        }
-      }}
-      title={isMenuOpen ? '' : label}
-      className={`group flex items-center w-full px-3 py-2 text-sm rounded-lg transition-colors ${
-        view === id 
-          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-      }`}
-    >
+          if (window.innerWidth < 1024) setIsMenuOpen(false); // Close on mobile
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            setView(id);
+            if (window.innerWidth < 1024) setIsMenuOpen(false);
+          }
+        }}
+        title={isMenuOpen ? '' : label}
+        className={`group flex items-center w-full px-3 py-2 text-sm rounded-lg transition-colors ${
+          view === id 
+            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+        }`}
+      >
       <div className="flex-shrink-0">{icon}</div>
       {isMenuOpen && <span className="ml-3 truncate">{label}</span>}
       {!isMenuOpen && (
@@ -269,8 +297,9 @@ const AppContent: React.FC = () => {
           {label}
         </div>
       )}
-    </button>
-  );
+      </button>
+    );
+  };
 
   return (
     <>
