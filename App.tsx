@@ -244,6 +244,17 @@ const AppContent: React.FC = () => {
         setView(id);
         if (window.innerWidth < 1024) setIsMenuOpen(false); // Close on mobile
       }}
+      onTouchStart={() => {
+        // Ensure touch taps trigger the same navigation on mobile devices
+        setView(id);
+        if (window.innerWidth < 1024) setIsMenuOpen(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          setView(id);
+          if (window.innerWidth < 1024) setIsMenuOpen(false);
+        }
+      }}
       title={isMenuOpen ? '' : label}
       className={`group flex items-center w-full px-3 py-2 text-sm rounded-lg transition-colors ${
         view === id 
