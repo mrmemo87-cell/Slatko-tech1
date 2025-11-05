@@ -739,38 +739,10 @@ GRANT EXECUTE ON FUNCTION public.rpc_order_complete(UUID) TO authenticated;
 -- Signal PostgREST to reload schema after installing functions
 NOTIFY pgrst, 'reload schema';
 
--- Insert some sample data for testing
-
--- Sample products
-INSERT INTO public.products (name, unit, stock, price, cost, category, description) VALUES
-('Chocolate Cake', 'piece', 10, 25.00, 15.00, 'Cakes', 'Rich chocolate layer cake'),
-('Vanilla Cupcakes', 'dozen', 5, 18.00, 12.00, 'Cupcakes', 'Classic vanilla cupcakes with buttercream'),
-('Croissant', 'piece', 20, 3.50, 2.00, 'Pastries', 'Buttery French croissant'),
-('Apple Pie', 'piece', 3, 22.00, 14.00, 'Pies', 'Traditional apple pie with cinnamon'),
-('Bread Loaf', 'loaf', 15, 4.50, 2.50, 'Bread', 'Fresh white bread loaf')
-ON CONFLICT DO NOTHING;
-
--- Sample materials
-INSERT INTO public.materials (name, unit, stock, cost_per_unit, min_stock_level) VALUES
-('Flour', 'kg', 50, 1.20, 10),
-('Sugar', 'kg', 30, 0.80, 5),
-('Butter', 'kg', 20, 4.50, 5),
-('Eggs', 'dozen', 15, 3.00, 5),
-('Cocoa Powder', 'kg', 8, 8.00, 2)
-ON CONFLICT DO NOTHING;
-
--- Sample clients
-INSERT INTO public.clients (name, business_name, email, phone, credit_limit, risk_level) VALUES
-('John Smith', 'Smith Catering', 'john@smithcatering.com', '+1-555-0101', 500.00, 'LOW'),
-('Maria Garcia', 'Garcia Events', 'maria@garciaevents.com', '+1-555-0102', 1000.00, 'LOW'),
-('Restaurant ABC', 'ABC Restaurant', 'orders@restaurant-abc.com', '+1-555-0103', 2000.00, 'MEDIUM')
-ON CONFLICT DO NOTHING;
-
 -- Success message
 DO $$
 BEGIN
     RAISE NOTICE '✅ Slatko Confectionery Management database schema created successfully!';
     RAISE NOTICE '📱 Ready for mobile app integration with Supabase';
     RAISE NOTICE '🔐 Row Level Security enabled - users need to be authenticated';
-    RAISE NOTICE '📊 Sample data inserted for testing';
 END $$;

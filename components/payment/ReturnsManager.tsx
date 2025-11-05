@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { paymentService, type OrderReturn, type ReturnLineItem } from '../../services/paymentService';
+import { supabaseApi } from '../../services/supabase-api';
 
 interface ReturnsManagerProps {
   deliveryId: string;
@@ -62,18 +63,25 @@ export const ReturnsManager: React.FC<ReturnsManagerProps> = ({
 
   const loadOrderItems = async (orderId: string) => {
     try {
-      // In a real implementation, you'd load the actual delivery items
-      // For now, we'll simulate some common items
-      const mockItems: DeliveryItem[] = [
-        { id: '1', product_name: 'Chocolate Cake', quantity: 2, price: 25.00 },
-        { id: '2', product_name: 'Vanilla Cupcakes', quantity: 12, price: 2.50 },
-        { id: '3', product_name: 'Strawberry Tart', quantity: 1, price: 18.00 },
-      ];
+      // Load actual delivery items from database
+      const deliveries = await supabaseApi.getDeliveries(1000);
+      const delivery = deliveries.find(d => d.id === orderId);
       
-      setOrderItems(mockItems);
+      if (delivery && delivery.items) {
+        const items: DeliveryItem[] = delivery.items.map((item, index) => ({
+          id: item.productId || `item-${index}`,
+          product_name: item.productName || '',
+          quantity: item.quantity,
+          price: item.price
+        }));
+        setOrderItems(items);
+      } else {
+        setOrderItems([]);
+      }
       
     } catch (error) {
       console.error('Error loading order items:', error);
+      setOrderItems([]);
     }
   };
 

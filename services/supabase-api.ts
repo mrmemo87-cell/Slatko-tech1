@@ -349,13 +349,24 @@ class SupabaseApiService {
         .from(TABLES.DELIVERIES)
         .select(`
           *,
-          clients:client_id (name, business_name)
+          clients!deliveries_client_id_fkey (name, business_name)
         `)
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(limit);
       
       const deliveries = await SupabaseService.handleResponse(deliveriesResponse);
+      
+      // Debug logging
+      console.log('🔍 Raw deliveries from DB:', deliveries.length);
+      if (deliveries.length > 0) {
+        console.log('📋 Sample delivery:', {
+          id: deliveries[0].id,
+          client_id: deliveries[0].client_id,
+          invoice_number: deliveries[0].invoice_number,
+          clients: deliveries[0].clients
+        });
+      }
       
       // Get all delivery items for these deliveries
       const deliveryIds = deliveries.map(d => d.id);
@@ -364,7 +375,7 @@ class SupabaseApiService {
           .from(TABLES.DELIVERY_ITEMS)
           .select(`
             *,
-            products:product_id (name, unit)
+            products!delivery_items_product_id_fkey (name, unit)
           `)
           .in('delivery_id', deliveryIds),
         
@@ -372,7 +383,7 @@ class SupabaseApiService {
           .from(TABLES.RETURN_ITEMS)
           .select(`
             *,
-            products:product_id (name)
+            products!return_items_product_id_fkey (name)
           `)
           .in('delivery_id', deliveryIds),
         
@@ -464,7 +475,7 @@ class SupabaseApiService {
           date: deliveryData.date,
           notes: deliveryData.notes,
           status: 'Pending',
-          workflow_stage: 'order_placed' // Explicitly set initial workflow stage
+          workflow_stage: 'order_placed'
         }])
         .select()
         .single();
@@ -552,7 +563,7 @@ class SupabaseApiService {
         .from(TABLES.PRODUCTION_BATCHES)
         .select(`
           *,
-          products:product_id (name, unit)
+          products!production_batches_product_id_fkey (name, unit)
         `)
         .order('start_date', { ascending: false });
       

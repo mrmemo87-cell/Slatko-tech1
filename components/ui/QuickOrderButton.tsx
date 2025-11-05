@@ -89,15 +89,36 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     try {
       setLoadingLastOrder(true);
       
+      console.log('🔍 Starting repeat order for client:', selectedClient.id, selectedClient.name);
+      
       // Get last order for this client using the API to ensure proper transformation
       const allDeliveries = await supabaseApi.getDeliveries(500); // Increase limit to get more deliveries
       console.log('📦 All deliveries loaded:', allDeliveries.length);
-      console.log('🔍 Looking for client ID:', selectedClient.id);
       
-      const clientDeliveries = allDeliveries
+      if (allDeliveries.length > 0) {
+        console.log('📋 Sample of first 3 deliveries:');
+        allDeliveries.slice(0, 3).forEach((d, i) => {
+          console.log(`  ${i + 1}. Order ${d.invoiceNumber} - Client ID: ${d.clientId}, Client Name: ${d.clientName}, Items: ${d.items?.length || 0}`);
+        });
+      }
+      
+      console.log('🔍 Looking for client ID:', selectedClient.id);
+      console.log('🔍 Looking for client name:', selectedClient.name);
+      
+      // Try to match by ID first, then fall back to name matching
+      let clientDeliveries = allDeliveries
         .filter(d => {
-          console.log('Comparing delivery clientId:', d.clientId, 'with selected client:', selectedClient.id, 'Match:', d.clientId === selectedClient.id);
-          return d.clientId === selectedClient.id;
+          const matchById = d.clientId === selectedClient.id;
+          const matchByName = d.clientName?.toLowerCase().includes(selectedClient.name.toLowerCase()) ||
+                             selectedClient.name.toLowerCase().includes(d.clientName?.toLowerCase() || '');
+          
+          if (!matchById && d.clientId) {
+            console.log(`❌ ID Mismatch: delivery ${d.invoiceNumber} has clientId ${d.clientId}, expected ${selectedClient.id}`);
+            if (matchByName) {
+              console.log(`✅ But NAMES match: "${d.clientName}" ~ "${selectedClient.name}"`);
+            }
+          }
+          return matchById || matchByName;
         })
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
@@ -128,11 +149,12 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
             product: {
               id: item.productId,
               name: item.productName || 'Unknown Product',
+              defaultPrice: item.price,
               price: item.price,
               stock: 0,
-              unit: 'pcs',
+              unit: 'pcs' as any,
               category: 'General'
-            } as Product,
+            },
             quantity: item.quantity
           });
         }

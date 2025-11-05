@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
+import { PaymentHistoryView } from '../payment/PaymentHistoryView';
 
 interface AllOrderRecordsViewProps {
   t: any;
@@ -46,6 +47,7 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'pending'>('all');
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'orders' | 'payment-history'>('orders');
 
   useEffect(() => {
     loadAllOrders();
@@ -246,14 +248,55 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
-          📊 All Order Records
-        </h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-4">
-          Complete view of all orders across all clients
-        </p>
+      {/* Header with Tabs */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+            📊 Order & Payment Records
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400">
+            Complete view of all orders and payment history
+          </p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              activeTab === 'orders'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            📦 All Orders
+          </button>
+          <button
+            onClick={() => setActiveTab('payment-history')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              activeTab === 'payment-history'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            � Payment History
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'payment-history' ? (
+        <PaymentHistoryView />
+      ) : (
+        <>
+          {/* Orders Tab Content */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+              All Order Records
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+              Complete view of all orders across all clients
+            </p>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
@@ -492,6 +535,8 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

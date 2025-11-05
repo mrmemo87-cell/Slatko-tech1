@@ -34,6 +34,10 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const [paymentDecision, setPaymentDecision] = useState<'now' | 'later' | null>(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [paymentReference, setPaymentReference] = useState('');
+  // New: Track which order to pay
+   const [payCurrent, setPayCurrent] = useState<boolean>(!!currentOrderId);
+   const [payPrevious, setPayPrevious] = useState<boolean>(false);
+  
 
   const computeOrderDue = (order: OrderPaymentRecord | null | undefined): number => {
     if (!order) return 0;
@@ -57,6 +61,17 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       return Math.max(0, Number(order.order_total) - paid);
     }
     return 0;
+  };
+
+  // Helper: when we have a delivery object (from supabaseApi) it may not be shaped
+  // the same as unpaidOrders entries. Prefer the unpaidOrders entry (which has
+  // delivery_id and payment meta) when available, otherwise fall back to computeOrderDue
+  const getOrderDueForDisplay = (delivery: any) => {
+    if (!delivery) return 0;
+    // Try to find matching unpaid order by delivery_id or id
+    const match = unpaidOrders.find(o => o.delivery_id === delivery.id || o.delivery_id === delivery.delivery_id || o.delivery_id === (delivery as any).id);
+    if (match) return computeOrderDue(match);
+    return computeOrderDue(delivery as any);
   };
 
   const resolveInvoiceNumber = (order: OrderPaymentRecord | null | undefined): string => {
@@ -276,37 +291,42 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const handlePayNow = async () => {
     try {
       setProcessing(true);
-      
-      // Determine if this is Srazo mode (paying current order only) or regular settlement
-      const isSrazoMode = unpaidOrders.length === 0 && !!currentOrderId;
+      // Determine settlement method and transaction method
       const settlementMethod = paymentMethod || 'cash';
       const transactionMethod = settlementMethod === 'SRAZU' ? 'cash' : settlementMethod;
 
+      // Determine which orders are selected for payment
+      const ordersToPay: string[] = [];
+      if (payCurrent && currentOrderId) ordersToPay.push(currentOrderId);
+      if (payPrevious && lastOrder?.id) ordersToPay.push(lastOrder.id);
+
+      // Calculate total due as sum of selected orders minus returns credit
       let totalDue = 0;
-      let ordersToPay: string[] = [];
-
-      if (isSrazoMode) {
-        if (currentOrder?.items) {
-          const currentOrderTotal = currentOrder.items.reduce((sum: number, item: any) =>
-            sum + (item.quantity * (item.price || 0)), 0
-          );
-          totalDue = Math.max(0, currentOrderTotal - getTotalReturnsCredit());
-          ordersToPay = [currentOrderId!];
+      if (ordersToPay.length > 0) {
+        for (const id of ordersToPay) {
+          if (id === currentOrderId && currentOrder?.items) {
+            const currentOrderTotal = currentOrder.items.reduce((sum: number, item: any) => sum + (item.quantity * (item.price || 0)), 0);
+            totalDue += currentOrderTotal;
+          } else if (lastOrder && id === (lastOrder.delivery_id || lastOrder.id)) {
+        totalDue += getOrderDueForDisplay(lastOrder);
+          } else {
+            // try to find in unpaidOrders
+            const found = unpaidOrders.find(o => o.delivery_id === id || (o as any).id === id);
+            if (found) totalDue += computeOrderDue(found);
+          }
         }
-      } else {
-        const baseTotal = unpaidOrders.reduce((sum, order) => sum + computeOrderDue(order), 0);
-        const returnsCredit = getTotalReturnsCredit();
-        totalDue = Math.max(0, baseTotal - returnsCredit);
-        ordersToPay = unpaidOrders.map(o => o.delivery_id);
       }
+      totalDue = Math.max(0, totalDue - getTotalReturnsCredit());
 
-      console.log('💰 Payment mode:', isSrazoMode ? 'Srazo (Current Order Only)' : 'Regular (All Unpaid)');
+      const isSrazoMode = settlementMethod === 'SRAZU' && payCurrent && !payPrevious && unpaidOrders.length === 0 && !!currentOrderId;
+
+      console.log('💰 Payment selection:', { payCurrent, payPrevious });
       console.log('💵 Total to pay:', totalDue);
       console.log('📦 Orders being paid:', ordersToPay);
 
       // Create settlement session
       const session = await paymentService.createSettlementSession({
-        delivery_id: currentOrderId || unpaidOrders[0]?.delivery_id,
+        delivery_id: ordersToPay[0] || currentOrderId || unpaidOrders[0]?.delivery_id,
         client_id: clientId,
         payment_type: 'full_payment',
         amount_collected: totalDue,
@@ -323,7 +343,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
         client_id: clientId,
         transaction_type: 'payment_received',
         amount: totalDue,
-        related_delivery_id: currentOrderId || unpaidOrders[0]?.delivery_id,
+        related_delivery_id: ordersToPay[0] || currentOrderId || unpaidOrders[0]?.delivery_id,
         payment_method: transactionMethod,
         reference_number: paymentReference || undefined,
         description: isSrazoMode 
@@ -331,64 +351,28 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           : `Settlement for ${unpaidOrders.length} order(s). Session: ${session.id}`
       });
 
-      // Update orders to Paid based on mode
-      if (isSrazoMode && currentOrderId) {
-        // Srazo: Mark only current order as paid
-        console.log('🔄 Updating current order to completed/paid:', currentOrderId);
+      // Update each selected order to Paid
+      for (const id of ordersToPay) {
+        console.log('🔄 Updating order to Paid:', id);
+        const updatePayload: any = {
+          status: 'Paid',
+          payment_status: 'paid',
+          payment_method: settlementMethod,
+          updated_at: new Date().toISOString()
+        };
+        // If this is the current order, also mark workflow_stage as completed
+        if (id === currentOrderId) {
+          updatePayload.workflow_stage = 'completed';
+        }
+
         const { error: updateError } = await supabase
           .from('deliveries')
-          .update({
-            workflow_stage: 'completed',
-            status: 'Paid',
-            payment_status: 'paid',
-            payment_method: settlementMethod,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentOrderId);
-        
+          .update(updatePayload)
+          .eq('id', id);
+
         if (updateError) {
           console.error('❌ Error updating delivery:', updateError);
           throw updateError;
-        }
-        console.log('✅ Delivery updated successfully');
-      } else {
-        // Regular: Update all unpaid orders to Paid
-        for (const order of unpaidOrders) {
-          console.log('🔄 Updating unpaid order to Paid:', order.delivery_id);
-          const { error: updateError } = await supabase
-            .from('deliveries')
-            .update({
-              status: 'Paid',
-              payment_status: 'paid',
-              payment_method: settlementMethod,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', order.delivery_id);
-          
-          if (updateError) {
-            console.error('❌ Error updating delivery:', updateError);
-            throw updateError;
-          }
-        }
-        
-        // Also mark current order as completed and paid
-        if (currentOrderId) {
-          console.log('🔄 Updating current order to completed/paid:', currentOrderId);
-          const { error: updateError } = await supabase
-            .from('deliveries')
-            .update({
-              workflow_stage: 'completed',
-              status: 'Paid',
-              payment_status: 'paid',
-              payment_method: settlementMethod,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', currentOrderId);
-          
-          if (updateError) {
-            console.error('❌ Error updating delivery:', updateError);
-            throw updateError;
-          }
         }
       }
 
@@ -425,16 +409,14 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   };
 
   const getTotalDue = () => {
-    // Check if Srazo mode (no unpaid orders, paying current order only)
+    // Only calculate total due for current order or all unpaid orders
     const isSrazoMode = unpaidOrders.length === 0 && currentOrder?.items;
-
     if (isSrazoMode && currentOrder?.items) {
       const currentOrderTotal = currentOrder.items.reduce((sum: number, item: any) =>
         sum + (item.quantity * (item.price || 0)), 0
       );
       return Math.max(0, currentOrderTotal - getTotalReturnsCredit());
     }
-
     const baseTotal = unpaidOrders.reduce((sum, order) => sum + computeOrderDue(order), 0);
     return Math.max(0, baseTotal - getTotalReturnsCredit());
   };
@@ -840,56 +822,43 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           {currentSlide === 'payment' && (
             <div className="space-y-4 animate-slideInRight">
               <h3 className="text-lg font-bold text-gray-900">Payment Details</h3>
-              
               <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900">Amount to Pay:</span>
-                  <span className="text-3xl font-bold text-blue-600">{formatCurrency(getTotalDue())}</span>
+                <div className="font-bold text-gray-900 mb-2">Choose which order to pay:</div>
+                <div className="flex flex-col gap-2 mb-4">
+                  <label className={`border rounded-lg p-3 flex items-center gap-3 cursor-pointer ${payCurrent ? 'border-blue-500 bg-blue-100' : 'border-gray-200'}`}> 
+                    <input
+                      type="checkbox"
+                      name="payCurrent"
+                      checked={payCurrent}
+                      onChange={() => setPayCurrent(!payCurrent)}
+                    />
+                    <span className="font-semibold">Current Order</span>
+                    {currentOrder && (
+                      <span className="ml-2 text-xs text-gray-700">#{currentOrder.invoiceNumber || currentOrder.invoice_number || '—'} | {formatDisplayDate(currentOrder.date) || '—'}</span>
+                    )}
+                    <span className="ml-auto font-bold text-blue-700">{formatCurrency(currentOrder?.items ? currentOrder.items.reduce((sum: number, item: any) => sum + (item.quantity * (item.price || 0)), 0) : 0)}</span>
+                  </label>
+                  {lastOrder && (
+                    <label className={`border rounded-lg p-3 flex items-center gap-3 cursor-pointer ${payPrevious ? 'border-blue-500 bg-blue-100' : 'border-gray-200'}`}> 
+                      <input
+                        type="checkbox"
+                        name="payPrevious"
+                        checked={payPrevious}
+                        onChange={() => setPayPrevious(!payPrevious)}
+                      />
+                      <span className="font-semibold">Previous Order</span>
+                      <span className="ml-2 text-xs text-gray-700">#{lastOrder.invoiceNumber || lastOrder.invoice_number || '—'} | {formatDisplayDate(lastOrder.date) || '—'}</span>
+                                <span className="ml-auto font-bold text-blue-700">{formatCurrency(getOrderDueForDisplay(lastOrder))}</span>
+                    </label>
+                  )}
                 </div>
-
-                {currentOrder && (
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-600">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">Invoice</div>
-                      <div className="font-semibold text-gray-900">
-                        #{currentOrder.invoiceNumber || currentOrder.invoice_number || '—'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-gray-500">Order Date</div>
-                      <div className="font-semibold text-gray-900">
-                        {formatDisplayDate(currentOrder.date) || '—'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {unpaidOrders.length > 0 && (
-                  <div className="mt-4 space-y-2 text-sm text-gray-600">
-                    <div className="text-xs uppercase tracking-wide text-gray-500">Included Orders</div>
-                    {unpaidOrders.map((order) => {
-                      const invoiceNumber = resolveInvoiceNumber(order);
-                      const orderDate = resolveOrderDate(order);
-                      return (
-                        <div key={order.delivery_id} className="flex justify-between items-center">
-                          <div>
-                            <span className="font-medium text-gray-900">
-                              {invoiceNumber ? `#${invoiceNumber}` : '#—'}
-                            </span>
-                            {orderDate && (
-                              <span className="ml-2 text-xs text-gray-500">
-                                {formatDisplayDate(orderDate)}
-                              </span>
-                            )}
-                          </div>
-                          <span className="font-semibold text-gray-900">{formatCurrency(computeOrderDue(order))}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="flex justify-between items-center mt-2">
+                  <span className="font-bold text-gray-900">Amount to Pay:</span>
+                  <span className="text-3xl font-bold text-blue-600">
+                    {formatCurrency(Math.max(0, (payCurrent ? (currentOrder?.items ? currentOrder.items.reduce((sum: number, item: any) => sum + (item.quantity * (item.price || 0)), 0) : 0) : 0) + (payPrevious ? getOrderDueForDisplay(lastOrder) : 0) - getTotalReturnsCredit()))}
+                  </span>
+                </div>
               </div>
-
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Payment Method</label>
                 <select
@@ -904,7 +873,6 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   <option value="check">📝 Check</option>
                 </select>
               </div>
-
               {(paymentMethod === 'bank_transfer' || paymentMethod === 'check') && (
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Reference Number</label>
@@ -917,7 +885,6 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   />
                 </div>
               )}
-
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setCurrentSlide('orders')}
@@ -928,7 +895,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                 </button>
                 <button
                   onClick={handlePayNow}
-                  disabled={processing}
+                  disabled={processing || (!payCurrent && !payPrevious)}
                   className="py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all disabled:opacity-50"
                 >
                   {processing ? 'Processing...' : 'Complete ✓'}
