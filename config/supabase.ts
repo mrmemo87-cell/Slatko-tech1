@@ -8,27 +8,43 @@ import type {
 const supabaseUrl = 'https://wfbvvbqzvolkbktvpnaq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYnZ2YnF6dm9sa2JrdHZwbmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwOTcyNjYsImV4cCI6MjA3NzY3MzI2Nn0.Q27Y-EJy0g2-XvQDXcbgo9K8UxwbBzCrTAkRaSi1NKE';
 
-if (!supabaseUrl) {
-	throw new Error('Missing VITE_SUPABASE_URL environment variable');
-}
+if (!supabaseUrl) throw new Error('Missing VITE_SUPABASE_URL environment variable');
+if (!supabaseAnonKey) throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
 
-if (!supabaseAnonKey) {
-	throw new Error('Missing VITE_SUPABASE_ANON_KEY environment variable');
-}
-
-console.log('🔧 Supabase Config:', {
-	url: supabaseUrl,
-	keyLength: supabaseAnonKey.length,
-	status: 'configured'
+// ✅ Explicit auth config so sessions persist & refresh properly in the browser
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+	auth: {
+		persistSession: true,
+		autoRefreshToken: true,
+		detectSessionInUrl: true,
+		storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+		flowType: 'pkce', // Use PKCE flow for better security
+	},
+	global: {
+		fetch: (...args) => {
+			console.log('🌐 Fetch request:', args[0]);
+			return fetch(...args);
+		},
+	},
 });
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (typeof window !== 'undefined' && (import.meta as any)?.env?.DEV) {
+	(window as any).supabase = supabase; // handy for console testing
+}
+
+console.log('🧪 Supabase Config:', {
+	url: supabaseUrl,
+	keyLength: supabaseAnonKey.length,
+	status: 'configured',
+});
 
 export const testConnection = async () => {
 	try {
 		console.log('Testing Supabase connection...');
-		const { data, error } = await supabase.from('clients').select('count').limit(1);
-		console.log('Connection test result:', { data, error });
+		const { error, count } = await supabase
+			.from('clients')
+			.select('*', { count: 'exact', head: true }); // head=true avoids fetching rows
+		console.log('Connection test result:', { count, error });
 		return { success: !error, error };
 	} catch (error) {
 		console.error('Connection test failed:', error);

@@ -5,6 +5,7 @@ import { Client, Product } from '../../types';
 import { generateId, formatCurrency } from '../../utils';
 import { Modal } from '../ui/Modal';
 import { PlusIcon, EditIcon, DeleteIcon } from '../ui/Icons';
+import { PageHeader } from '../ui/PageHeader';
 
 interface ClientsViewProps {
   // FIX: Changed 't' prop type from TranslationFunction to 'any' to match the shape of the translation object.
@@ -81,71 +82,96 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ t, showToast }) => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">{t.clients.title}</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-        >
-          <PlusIcon className="mr-2" />
-          {t.clients.newClient}
-        </button>
+    <div className="min-h-screen relative overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
+      {/* DRAMATIC Gradient Background */}
+      <div className="absolute inset-0 -z-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-purple-600 to-pink-600 animate-gradient-x"></div>
+        <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/40 via-purple-500/40 to-cyan-500/40 animate-gradient-y"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-purple-900/20 to-black/40"></div>
       </div>
-      
-      <input
-        type="text"
-        placeholder={t.common.search}
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full p-2 border border-slate-300 rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-      />
 
-      <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-slate-500 dark:text-slate-400">Loading clients...</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm text-left text-slate-500 dark:text-slate-400">
-            <thead className="text-xs text-slate-700 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-300">
-              <tr>
-                <th scope="col" className="px-6 py-3">{t.clients.businessName}</th>
-                <th scope="col" className="px-6 py-3">{t.clients.contactPerson}</th>
-                <th scope="col" className="px-6 py-3">{t.clients.phone}</th>
-                <th scope="col" className="px-6 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClients.map(client => (
-                <tr key={client.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
-                  <td className="px-6 py-4 font-medium text-slate-900 dark:text-white whitespace-nowrap">{client.businessName}</td>
-                  <td className="px-6 py-4">{client.name}</td>
-                  <td className="px-6 py-4">{client.phone}</td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={() => handleOpenModal(client)} className="text-blue-600 hover:text-blue-800"><EditIcon /></button>
-                    <button onClick={() => handleDelete(client.id)} className="text-red-600 hover:text-red-800"><DeleteIcon /></button>
-                  </td>
-                </tr>
-              ))}
-              {filteredClients.length === 0 && (
+      {/* Animated Mesh Gradient Orbs */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-radial from-cyan-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-slow"></div>
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-radial from-pink-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-reverse"></div>
+      </div>
+
+      <div className="relative z-10 space-y-6">
+        <div className="flex justify-between items-center mb-4">
+          <PageHeader 
+            title={t.clients.title}
+            description="Manage your clients and business relationships"
+            icon="👥"
+            theme="clients"
+          />
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center backdrop-blur-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105 shadow-[0_8px_32px_rgba(0,150,200,0.4)] border border-white/20"
+          >
+            <PlusIcon className="mr-2" />
+            {t.clients.newClient}
+          </button>
+        </div>
+        
+        {/* Search Bar - Glassmorphism */}
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-500"></div>
+          <input
+            type="text"
+            placeholder={t.common.search}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="relative w-full px-5 py-3 border-0 text-gray-900 dark:text-white rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-lg placeholder-gray-400"
+          />
+        </div>
+
+        {/* Clients Table - Glassmorphism */}
+        <div className="backdrop-blur-3xl bg-white/10 dark:bg-black/20 rounded-2xl overflow-hidden border border-white/20 shadow-[0_8px_32px_0_rgba(0,208,232,0.2)]">
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-cyan-400 border-t-transparent mb-4"></div>
+              <p className="mt-3 text-white/70 font-semibold">Loading clients...</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm text-left text-white/70">
+              <thead className="text-xs font-bold uppercase bg-gradient-to-r from-cyan-500/20 to-pink-500/20 text-white/90 border-b border-white/10">
                 <tr>
-                  <td colSpan={4} className="text-center py-4">{t.common.noResults}</td>
+                  <th scope="col" className="px-6 py-4 drop-shadow-lg">{t.clients.businessName}</th>
+                  <th scope="col" className="px-6 py-4 drop-shadow-lg">{t.clients.contactPerson}</th>
+                  <th scope="col" className="px-6 py-4 drop-shadow-lg">{t.clients.phone}</th>
+                  <th scope="col" className="px-6 py-4 text-right drop-shadow-lg">Actions</th>
                 </tr>
-              )}
-            </tbody>
-        </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {filteredClients.map(client => (
+                  <tr key={client.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-bold text-white drop-shadow-lg whitespace-nowrap">{client.businessName}</td>
+                    <td className="px-6 py-4 text-white/80">{client.name}</td>
+                    <td className="px-6 py-4 text-white/80">{client.phone}</td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button onClick={() => handleOpenModal(client)} className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20 p-2 rounded-lg transition-colors"><EditIcon /></button>
+                      <button onClick={() => handleDelete(client.id)} className="text-pink-400 hover:text-pink-300 hover:bg-pink-500/20 p-2 rounded-lg transition-colors"><DeleteIcon /></button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredClients.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-white/50">{t.common.noResults}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      <ClientFormModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSave}
-        client={editingClient}
-        t={t}
-      />
+        <ClientFormModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSave}
+          client={editingClient}
+          t={t}
+        />
+      </div>
     </div>
   );
 };

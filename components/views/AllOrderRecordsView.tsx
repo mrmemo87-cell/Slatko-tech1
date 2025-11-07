@@ -200,7 +200,7 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
       'paid': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
       'unpaid': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
       'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      'partial': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
+      'partial': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
     };
     return badges[status as keyof typeof badges] || badges.pending;
   };
@@ -488,7 +488,7 @@ export const AllOrderRecordsView: React.FC<AllOrderRecordsViewProps> = ({ t, sho
                           {order.previous_invoice_balance && order.previous_invoice_balance > 0 && (
                             <div className="flex justify-between">
                               <span className="text-slate-600 dark:text-slate-400">Previous Balance:</span>
-                              <span className="font-medium text-orange-600 dark:text-orange-400">${order.previous_invoice_balance.toFixed(2)}</span>
+                              <span className="font-medium text-purple-600 dark:text-purple-400">${order.previous_invoice_balance.toFixed(2)}</span>
                             </div>
                           )}
                         </div>

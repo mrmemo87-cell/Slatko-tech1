@@ -7,6 +7,7 @@ import { Modal } from '../ui/Modal';
 import { PlusIcon, EditIcon, DeleteIcon } from '../ui/Icons';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useMaterials } from '../../hooks/useDataQueries';
 import { PRODUCT_CATEGORIES, groupProductsByCategory } from '../../constants/productCategories';
+import { PageHeader } from '../ui/PageHeader';
 
 interface ProductsViewProps {
   // FIX: Changed 't' prop type from TranslationFunction to 'any' to match the shape of the translation object.
@@ -69,127 +70,151 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ t, showToast }) => {
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">{t.products.title}</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-        >
-          <PlusIcon className="mr-2" />
-          {t.products.newProduct}
-        </button>
+    <div className="min-h-screen relative overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
+      {/* DRAMATIC Gradient Background */}
+      <div className="absolute inset-0 -z-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-purple-600 to-pink-600 animate-gradient-x"></div>
+        <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/40 via-purple-500/40 to-cyan-500/40 animate-gradient-y"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-purple-900/20 to-black/40"></div>
       </div>
-      
-      <input
-        type="text"
-        placeholder={t.common.search}
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full p-2 border border-slate-300 rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-      />
 
-      <div className="space-y-4">
-        {Object.entries(groupProductsByCategory(filteredProducts)).map(([categoryName, categoryProducts]) => {
-          const isExpanded = expandedCategories.has(categoryName);
-          
-          return (
-            <div key={categoryName} className="bg-white dark:bg-slate-800 shadow-md rounded-lg overflow-hidden">
-              {/* Category Header */}
-              <button
-                onClick={() => {
-                  const newExpanded = new Set(expandedCategories);
-                  if (isExpanded) {
-                    newExpanded.delete(categoryName);
-                  } else {
-                    newExpanded.add(categoryName);
-                  }
-                  setExpandedCategories(newExpanded);
-                }}
-                className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+      {/* Animated Mesh Gradient Orbs */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-radial from-cyan-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-slow"></div>
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-radial from-pink-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-reverse"></div>
+      </div>
+
+      <div className="relative z-10 space-y-6">
+        <div className="flex justify-between items-center mb-4">
+          <PageHeader 
+            title={t.products.title}
+            description="Manage your confectionery products and recipes"
+            icon="🍰"
+            theme="products"
+          />
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center backdrop-blur-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105 shadow-[0_8px_32px_rgba(255,45,145,0.4)] border border-white/20"
+          >
+            <PlusIcon className="mr-2" />
+            {t.products.newProduct}
+          </button>
+        </div>
+        
+        {/* Search Bar - Glassmorphism */}
+        <div className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-pink-400 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-500"></div>
+          <input
+            type="text"
+            placeholder={t.common.search}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="relative w-full px-5 py-3 border-0 text-gray-900 dark:text-white rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-lg placeholder-gray-400"
+          />
+        </div>
+
+        <div className="space-y-4">
+          {Object.entries(groupProductsByCategory(filteredProducts)).map(([categoryName, categoryProducts]) => {
+            const isExpanded = expandedCategories.has(categoryName);
+            
+            return (
+              <div key={categoryName} className="backdrop-blur-3xl bg-white/10 dark:bg-black/20 rounded-2xl overflow-hidden border border-white/20 shadow-[0_8px_32px_0_rgba(0,208,232,0.2)]">
+                {/* Category Header */}
+                <button
+                  onClick={() => {
+                    const newExpanded = new Set(expandedCategories);
+                    if (isExpanded) {
+                      newExpanded.delete(categoryName);
+                    } else {
+                      newExpanded.add(categoryName);
+                    }
+                    setExpandedCategories(newExpanded);
+                  }}
+                  className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-cyan-500/10 to-pink-500/10 hover:from-cyan-500/20 hover:to-pink-500/20 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`transform transition-transform text-white ${isExpanded ? 'rotate-90' : ''}`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-bold text-white drop-shadow-lg">{categoryName}</h3>
+                    <span className="bg-gradient-to-r from-cyan-400 to-pink-400 bg-clip-text text-transparent text-xs px-3 py-1 rounded-full border border-white/20 font-semibold">
+                      {categoryProducts.length} products
+                    </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-white">{categoryName}</h3>
-                  <span className="bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 text-xs px-2 py-1 rounded-full">
-                    {categoryProducts.length} products
-                  </span>
-                </div>
-              </button>
-              
-              {/* Category Products */}
-              {isExpanded && (
-                <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {categoryProducts.map(product => (
-                    <div key={product.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-slate-900 dark:text-white">{product.name}</h4>
-                          <div className="flex items-center space-x-4 mt-1 text-sm text-slate-500 dark:text-slate-400">
-                            <span>{product.unit}</span>
-                            <span className="font-medium text-green-600 dark:text-green-400">
-                              {formatCurrency(product.defaultPrice)}
-                            </span>
-                            {product.recipe && (
-                              <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                                {product.recipe.length} ingredients
+                </button>
+                
+                {/* Category Products */}
+                {isExpanded && (
+                  <div className="divide-y divide-white/10">
+                    {categoryProducts.map(product => (
+                      <div key={product.id} className="p-5 hover:bg-white/5 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-bold text-white drop-shadow-lg">{product.name}</h4>
+                            <div className="flex items-center space-x-4 mt-2 text-sm text-white/70">
+                              <span className="drop-shadow-lg">{product.unit}</span>
+                              <span className="font-bold bg-gradient-to-r from-cyan-300 to-pink-300 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(0,208,232,0.4)]">
+                                {formatCurrency(product.defaultPrice)}
                               </span>
-                            )}
+                              {product.recipe && (
+                                <span className="text-xs bg-white/20 px-3 py-1 rounded-lg backdrop-blur-xl border border-white/20">
+                                  {product.recipe.length} ingredients
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleOpenModal(product)}
+                              className="p-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20 rounded-lg transition-colors backdrop-blur-xl"
+                            >
+                              <EditIcon />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(product.id)}
+                              className="p-2 text-pink-400 hover:text-pink-300 hover:bg-pink-500/20 rounded-lg transition-colors backdrop-blur-xl"
+                            >
+                              <DeleteIcon />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleOpenModal(product)}
-                            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          >
-                            <EditIcon />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          >
-                            <DeleteIcon />
-                          </button>
-                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {categoryProducts.length === 0 && searchTerm && (
-                    <div className="p-4 text-center text-slate-500 dark:text-slate-400">
-                      No products in this category match your search
-                    </div>
-                  )}
-                </div>
-              )}
+                    ))}
+                    {categoryProducts.length === 0 && searchTerm && (
+                      <div className="p-4 text-center text-white/50">
+                        No products in this category match your search
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          
+          {filteredProducts.length === 0 && !searchTerm && (
+            <div className="text-center py-12 text-white/60">
+              No products found. Click "Add Product" to create your first product.
             </div>
-          );
-        })}
-        
-        {filteredProducts.length === 0 && !searchTerm && (
-          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-            No products found. Click "Add Product" to create your first product.
-          </div>
-        )}
-        
-        {filteredProducts.length === 0 && searchTerm && (
-          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-            {t.common.noResults}
-          </div>
-        )}
-      </div>
+          )}
+          
+          {filteredProducts.length === 0 && searchTerm && (
+            <div className="text-center py-12 text-white/60">
+              {t.common.noResults}
+            </div>
+          )}
+        </div>
 
-      <ProductFormModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={saveProduct}
-        product={editingProduct}
-        materials={materials}
-        t={t}
-      />
+        <ProductFormModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          onSave={saveProduct}
+          product={editingProduct}
+          materials={materials}
+          t={t}
+        />
+      </div>
     </div>
   );
 };

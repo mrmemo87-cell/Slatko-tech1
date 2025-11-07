@@ -22,7 +22,7 @@ export const MobileProductionList: React.FC<MobileProductionListProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PLANNED': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'IN_PROGRESS': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'IN_PROGRESS': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'COMPLETED': return 'bg-green-100 text-green-800 border-green-200';
       case 'QUALITY_HOLD': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200';
@@ -88,7 +88,7 @@ export const MobileProductionList: React.FC<MobileProductionListProps> = ({
       case 'PLANNED': 
         return { action: 'Start Production', status: 'IN_PROGRESS', color: 'bg-blue-600' };
       case 'IN_PROGRESS': 
-        return { action: 'Quality Check', status: 'QUALITY_HOLD', color: 'bg-orange-600' };
+        return { action: 'Quality Check', status: 'QUALITY_HOLD', color: 'bg-purple-600' };
       case 'QUALITY_HOLD': 
         return { action: 'Complete Batch', status: 'COMPLETED', color: 'bg-green-600' };
       default: 

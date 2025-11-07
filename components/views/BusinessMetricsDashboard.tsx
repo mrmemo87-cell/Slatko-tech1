@@ -238,11 +238,11 @@ export const BusinessMetricsDashboard: React.FC<BusinessMetricsDashboardProps> =
             </div>
           </button>
           
-          <button className="p-4 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 rounded-lg text-left transition-colors">
-            <div className="font-medium text-orange-800 dark:text-orange-200 mb-1">
+          <button className="p-4 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 rounded-lg text-left transition-colors">
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-1">
               📊 Generate Reports
             </div>
-            <div className="text-sm text-orange-600 dark:text-orange-300">
+            <div className="text-sm text-purple-600 dark:text-purple-300">
               Export detailed analytics
             </div>
           </button>

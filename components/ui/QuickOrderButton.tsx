@@ -266,13 +266,36 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
 
   return (
     <>
-      {/* Floating Action Button */}
+      {/* AWESOME Floating Action Button with "Add Order" text */}
       <button
         onClick={handleOpen}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full shadow-2xl flex items-center justify-center text-3xl transition-all duration-300 hover:scale-110 active:scale-95"
-        style={{ boxShadow: '0 8px 32px rgba(59, 130, 246, 0.5)' }}
+        className="fixed bottom-6 right-6 z-50 group"
+        style={{ perspective: '1000px' }}
       >
-        ⚡
+        {/* Multi-layer glow background */}
+        <div className="absolute inset-0 w-24 h-24 -bottom-2 -right-2 bg-gradient-to-br from-cyan-400 to-pink-500 rounded-full blur-2xl opacity-60 group-hover:opacity-80 transition-opacity duration-300 animate-pulse"></div>
+        <div className="absolute inset-0 w-24 h-24 -bottom-1 -right-1 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-300 animate-pulse animation-delay-1000"></div>
+        
+        {/* Main Button */}
+        <div className="relative w-24 h-24 bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 active:scale-95 group-hover:shadow-pink-500/50 group-hover:shadow-2xl overflow-hidden">
+          {/* Shimmer effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-300 rounded-full" style={{ animation: 'shimmer 2s infinite' }}></div>
+          
+          {/* Inner glow */}
+          <div className="absolute inset-1 bg-gradient-to-br from-cyan-400 to-pink-400 rounded-full opacity-40"></div>
+          
+          {/* Content */}
+          <div className="relative flex flex-col items-center justify-center text-white z-10">
+            <div className="text-3xl font-bold mb-1 drop-shadow-lg">➕</div>
+            <div className="text-xs font-bold text-center leading-tight drop-shadow-lg">
+              ADD<br/>ORDER
+            </div>
+          </div>
+          
+          {/* Sparkle animation */}
+          <div className="absolute top-2 left-2 w-2 h-2 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ animation: 'sparkle 1.5s ease-in-out infinite' }}></div>
+          <div className="absolute bottom-3 right-3 w-1.5 h-1.5 bg-white rounded-full opacity-0 group-hover:opacity-75 transition-opacity duration-300" style={{ animation: 'sparkle 2s ease-in-out infinite' }}></div>
+        </div>
       </button>
 
       {/* Modal */}
@@ -399,8 +422,8 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
 
                       {/* Quick Add - Most Popular Items */}
                       {!searchTerm && cart.length === 0 && (
-                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border-2 border-amber-200">
-                          <div className="text-sm font-bold text-amber-700 mb-2">⚡ Quick Add Popular</div>
+                        <div className="bg-gradient-to-r from-cyan-50 to-purple-50 p-4 rounded-lg border-2 border-cyan-200">
+                          <div className="text-sm font-bold text-cyan-700 mb-2">⚡ Quick Add Popular</div>
                           <div className="grid grid-cols-2 gap-2">
                             {products.filter(p => 
                               p.name.toLowerCase().includes('dubai') || 
@@ -410,10 +433,10 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                               <button
                                 key={product.id}
                                 onClick={() => handleAddToCart(product)}
-                                className="p-2 bg-white border-2 border-amber-300 rounded-lg hover:bg-amber-100 transition-all"
+                                className="p-2 bg-white border-2 border-cyan-300 rounded-lg hover:bg-cyan-100 transition-all"
                               >
                                 <div className="text-sm font-semibold text-gray-900">{product.name}</div>
-                                <div className="text-xs font-bold text-amber-600">${product.price}</div>
+                                <div className="text-xs font-bold text-cyan-600">${product.price}</div>
                               </button>
                             ))}
                           </div>
@@ -688,6 +711,32 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
         }
         .animate-slideUp {
           animation: slideUp 0.3s ease-out;
+        }
+        
+        /* Shimmer effect for button */
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        
+        /* Sparkle effect */
+        @keyframes sparkle {
+          0%, 100% {
+            opacity: 0;
+            transform: scale(0);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        .animation-delay-1000 {
+          animation-delay: 1s;
         }
       `}</style>
     </>

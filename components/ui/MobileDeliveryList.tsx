@@ -24,7 +24,7 @@ export const MobileDeliveryList: React.FC<MobileDeliveryListProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'Pending': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'Settled': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'Paid': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -126,7 +126,7 @@ export const MobileDeliveryList: React.FC<MobileDeliveryListProps> = ({
                   onClick={() => setSelectedDelivery(delivery)}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
                     delivery.status === 'Pending'
-                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
                       : balance > 0
                       ? 'bg-red-600 text-white hover:bg-red-700'
                       : 'bg-green-600 text-white hover:bg-green-700'

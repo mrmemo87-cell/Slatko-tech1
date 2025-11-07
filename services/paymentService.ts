@@ -156,8 +156,8 @@ class PaymentService {
         current_balance: -total_debt, // Negative = client owes money
         total_debt: total_debt,
         total_credit: 0, // Would need to calculate from credits if implemented
-        last_payment_date: lastPayment?.date || null,
-        last_order_date: lastOrder?.date || null
+        last_payment_date: (lastPayment as any)?.date || null,
+        last_order_date: (lastOrder as any)?.date || null
       };
     } catch (error) {
       console.error('Error getting client balance:', error);
@@ -169,9 +169,9 @@ class PaymentService {
     // This is handled automatically by database triggers
     // But we can manually refresh if needed
     try {
-      await supabase.rpc('update_client_balance_manual', { 
+      await (supabase.rpc('update_client_balance_manual', { 
         client_id: clientId 
-      });
+      }) as any);
     } catch (error) {
       console.error('Error updating client balance:', error);
       // Don't throw - this is handled by triggers anyway
@@ -197,24 +197,24 @@ class PaymentService {
       }
 
       // Get delivery items
-      const { data: items, error: itemsError } = await supabase
+      const { data: items, error: itemsError } = await (supabase
         .from('delivery_items')
         .select('quantity, price')
-        .eq('delivery_id', deliveryId);
+        .eq('delivery_id', deliveryId) as any);
 
       if (itemsError) throw itemsError;
 
       // Get payments made
-      const { data: payments, error: paymentsError } = await supabase
+      const { data: payments, error: paymentsError } = await (supabase
         .from('payments')
         .select('amount')
-        .eq('delivery_id', deliveryId);
+        .eq('delivery_id', deliveryId) as any);
 
       if (paymentsError) throw paymentsError;
 
       // Calculate totals
-      const orderTotal = (items || []).reduce((sum, item) => sum + (item.quantity * item.price), 0);
-      const amountPaid = (payments || []).reduce((sum, payment) => sum + payment.amount, 0);
+      const orderTotal = ((items as any) || []).reduce((sum: number, item: any) => sum + (item.quantity * item.price), 0);
+      const amountPaid = ((payments as any) || []).reduce((sum: number, payment: any) => sum + payment.amount, 0);
       const amountRemaining = orderTotal - amountPaid;
 
       let paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'waived' = 'unpaid';
@@ -225,18 +225,18 @@ class PaymentService {
       }
 
       return {
-        id: delivery.id,
-        delivery_id: delivery.id,
-        client_id: delivery.client_id,
+        id: (delivery as any).id,
+        delivery_id: (delivery as any).id,
+        client_id: (delivery as any).client_id,
         order_total: orderTotal,
         amount_paid: amountPaid,
         amount_remaining: amountRemaining,
         payment_status: paymentStatus,
-        payment_method: delivery.payment_method,
+        payment_method: (delivery as any).payment_method,
         payment_date: undefined,
         due_date: undefined,
         is_return_policy_order: false,
-        created_at: delivery.created_at
+        created_at: (delivery as any).created_at
       };
     } catch (error) {
       console.error('Error getting order payment record:', error);
@@ -271,54 +271,54 @@ class PaymentService {
       }
 
       // Get all delivery items for these orders
-      const deliveryIds = deliveries.map(d => d.id);
-      const { data: items, error: itemsError } = await supabase
+      const deliveryIds = (deliveries as any[]).map(d => (d as any).id);
+      const { data: items, error: itemsError } = await (supabase
         .from('delivery_items')
         .select('delivery_id, quantity, price')
-        .in('delivery_id', deliveryIds);
+        .in('delivery_id', deliveryIds) as any);
 
       if (itemsError) throw itemsError;
 
       // Get all return items for these orders
-      const { data: returns, error: returnsError } = await supabase
+      const { data: returns, error: returnsError } = await (supabase
         .from('return_items')
         .select('delivery_id, quantity')
-        .in('delivery_id', deliveryIds);
+        .in('delivery_id', deliveryIds) as any);
 
       if (returnsError) throw returnsError;
 
       // Get payments made for these orders
-      const { data: payments, error: paymentsError } = await supabase
+      const { data: payments, error: paymentsError } = await (supabase
         .from('payments')
         .select('delivery_id, amount')
-        .in('delivery_id', deliveryIds);
+        .in('delivery_id', deliveryIds) as any);
 
       if (paymentsError) throw paymentsError;
 
       // Group items, returns, and payments by delivery
-      const itemsByDelivery = (items || []).reduce((acc, item) => {
-        if (!acc[item.delivery_id]) acc[item.delivery_id] = [];
-        acc[item.delivery_id].push(item);
+      const itemsByDelivery = ((items || []) as any[]).reduce((acc, item) => {
+        if (!acc[(item as any).delivery_id]) acc[(item as any).delivery_id] = [];
+        acc[(item as any).delivery_id].push(item);
         return acc;
       }, {} as Record<string, any[]>);
 
-      const returnsByDelivery = (returns || []).reduce((acc, ret) => {
-        if (!acc[ret.delivery_id]) acc[ret.delivery_id] = 0;
-        acc[ret.delivery_id] += ret.quantity;
+      const returnsByDelivery = ((returns || []) as any[]).reduce((acc, ret) => {
+        if (!acc[(ret as any).delivery_id]) acc[(ret as any).delivery_id] = 0;
+        acc[(ret as any).delivery_id] += (ret as any).quantity;
         return acc;
       }, {} as Record<string, number>);
 
-      const paymentsByDelivery = (payments || []).reduce((acc, payment) => {
-        if (!acc[payment.delivery_id]) acc[payment.delivery_id] = 0;
-        acc[payment.delivery_id] += payment.amount;
+      const paymentsByDelivery = ((payments || []) as any[]).reduce((acc, payment) => {
+        if (!acc[(payment as any).delivery_id]) acc[(payment as any).delivery_id] = 0;
+        acc[(payment as any).delivery_id] += (payment as any).amount;
         return acc;
       }, {} as Record<string, number>);
 
       // Calculate order totals and payment records
-      return deliveries.map(delivery => {
-        const deliveryItems = itemsByDelivery[delivery.id] || [];
-        const orderTotal = deliveryItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-        const amountPaid = paymentsByDelivery[delivery.id] || 0;
+      return (deliveries as any[]).map(delivery => {
+        const deliveryItems = itemsByDelivery[(delivery as any).id] || [];
+        const orderTotal = (deliveryItems as any[]).reduce((sum, item) => sum + ((item as any).quantity * (item as any).price), 0);
+        const amountPaid = paymentsByDelivery[(delivery as any).id] || 0;
         const amountRemaining = orderTotal - amountPaid;
 
         let paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid' | 'waived' = 'unpaid';
@@ -333,28 +333,28 @@ class PaymentService {
         }
 
         return {
-          id: delivery.id,
-          delivery_id: delivery.id,
-          client_id: delivery.client_id,
+          id: (delivery as any).id,
+          delivery_id: (delivery as any).id,
+          client_id: (delivery as any).client_id,
           order_total: orderTotal,
           amount_paid: amountPaid,
           amount_remaining: amountRemaining,
           payment_status: paymentStatus,
           db_payment_status: dbPaymentStatus, // Store mapped value
-          payment_method: delivery.payment_method,
+          payment_method: (delivery as any).payment_method,
           payment_date: undefined,
           due_date: undefined,
           is_return_policy_order: false,
           notes: undefined,
-          created_at: delivery.created_at,
-          invoice_number: delivery.invoice_number?.toString(),
-          order_date: delivery.date,
+          created_at: (delivery as any).created_at,
+          invoice_number: (delivery as any).invoice_number?.toString(),
+          order_date: (delivery as any).date,
           amount_due: amountRemaining,
           delivery: {
-            invoice_number: delivery.invoice_number?.toString(),
-            date: delivery.date,
-            workflow_stage: delivery.workflow_stage,
-            status: delivery.status,
+            invoice_number: (delivery as any).invoice_number?.toString(),
+            date: (delivery as any).date,
+            workflow_stage: (delivery as any).workflow_stage,
+            status: (delivery as any).status,
             amount_due: amountRemaining,
             amount_paid: amountPaid
           }
@@ -375,7 +375,7 @@ class PaymentService {
   ): Promise<void> {
     try {
       // Insert payment record
-      const { error: paymentError } = await supabase
+      const { error: paymentError } = await (supabase
         .from('payments')
         .insert({
           delivery_id: deliveryId,
@@ -383,7 +383,7 @@ class PaymentService {
           method: paymentMethod,
           reference: reference,
           date: new Date().toISOString().split('T')[0]
-        });
+        }) as any);
 
       if (paymentError) throw paymentError;
 
@@ -402,14 +402,14 @@ class PaymentService {
       }
 
       // Update delivery payment status
-      const { error: deliveryError } = await supabase
+      const { error: deliveryError } = await (supabase
         .from('deliveries')
         .update({
           payment_status: dbStatus,
           payment_method: paymentMethod,
           updated_at: new Date().toISOString()
         })
-        .eq('id', deliveryId);
+        .eq('id', deliveryId) as any);
 
       if (deliveryError) throw deliveryError;
 
@@ -435,7 +435,7 @@ class PaymentService {
   }): Promise<PaymentTransaction> {
     try {
       // Use core payments table instead of payment_transactions
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('payments')
         .insert({
           delivery_id: transaction.related_delivery_id,
@@ -445,23 +445,23 @@ class PaymentService {
           reference: transaction.reference_number
         })
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
       
       // Return in PaymentTransaction format for compatibility
       return {
-        id: data.id,
+        id: data!.id,
         client_id: transaction.client_id,
         transaction_type: transaction.transaction_type,
-        amount: data.amount,
-        transaction_date: data.date,
-        payment_method: data.method || 'cash',
-        reference_number: data.reference || undefined,
+        amount: data!.amount,
+        transaction_date: data!.date,
+        payment_method: data!.method || 'cash',
+        reference_number: data!.reference || undefined,
         description: transaction.description,
-        related_delivery_id: data.delivery_id || undefined,
+        related_delivery_id: data!.delivery_id || undefined,
         recorded_by: transaction.recorded_by,
-        created_at: data.created_at
+        created_at: data!.created_at
       };
     } catch (error) {
       console.error('Error recording payment transaction:', error);
@@ -472,17 +472,17 @@ class PaymentService {
   async getClientPaymentHistory(clientId: string, limit = 20): Promise<PaymentTransaction[]> {
     try {
       // Query payments joined with deliveries to filter by client_id
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('payments')
         .select('*, deliveries!payments_delivery_id_fkey(client_id)')
         .eq('deliveries.client_id', clientId)
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .limit(limit) as any);
 
       if (error) throw error;
       
       // Convert to PaymentTransaction format
-      return (data || []).map(payment => ({
+      return (data || []).map((payment: any) => ({
         id: payment.id,
         client_id: clientId,
         transaction_type: 'payment_received' as const,
@@ -512,7 +512,7 @@ class PaymentService {
       
       if (options.amount_collected && options.amount_collected > 0) {
         // Record payment
-        await supabase
+        await (supabase
           .from('payments')
           .insert({
             delivery_id: options.delivery_id,
@@ -520,7 +520,7 @@ class PaymentService {
             amount: options.amount_collected,
             method: options.payment_method || 'cash',
             reference: options.payment_reference
-          });
+          }) as any);
         
         // Update delivery payment status
         const unpaidOrders = await this.getClientUnpaidOrders(options.client_id);
@@ -529,10 +529,10 @@ class PaymentService {
         if (delivery) {
           // Map to db-compatible status
           const newStatus = options.amount_collected >= delivery.amount_remaining ? 'paid' : 'awaiting_confirmation';
-          await supabase
+          await (supabase
             .from('deliveries')
             .update({ payment_status: newStatus })
-            .eq('id', options.delivery_id);
+            .eq('id', options.delivery_id) as any);
         }
       }
       
@@ -763,10 +763,10 @@ class PaymentService {
         reason: item.reason || item.notes || returnData.return_type
       }));
 
-      const { data: insertedItems, error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await (supabase
         .from('return_items')
         .insert(returnItems)
-        .select();
+        .select() as any);
 
       if (itemsError) throw itemsError;
 
@@ -800,13 +800,13 @@ class PaymentService {
   async getOrderReturns(deliveryId: string): Promise<OrderReturn[]> {
     try {
       // Use core return_items table
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('return_items')
         .select(`
           *,
           products!return_items_product_id_fkey (name, price)
         `)
-        .eq('delivery_id', deliveryId);
+        .eq('delivery_id', deliveryId) as any);
 
       if (error) throw error;
 
@@ -819,7 +819,7 @@ class PaymentService {
         client_id: '', // Will be populated from delivery if needed
         return_type: 'unsold_return',
         return_date: new Date().toISOString(),
-        items: data.map(item => ({
+        items: (data || []).map((item: any) => ({
           id: item.id,
           product_name: item.products?.name || 'Unknown',
           quantity_returned: item.quantity,
@@ -903,8 +903,8 @@ class PaymentService {
 
   async getNetAmountDue(deliveryId: string): Promise<number> {
     try {
-      const { data, error } = await supabase
-        .rpc('get_net_amount_due', { p_delivery_id: deliveryId });
+      const { data, error } = await (supabase
+        .rpc('get_net_amount_due', { p_delivery_id: deliveryId }) as any);
 
       if (error) throw error;
       return data || 0;

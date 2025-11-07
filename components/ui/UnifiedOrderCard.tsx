@@ -23,36 +23,36 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
   const stageInfo = unifiedWorkflow.getStageInfo(order.workflowStage);
   
   const getActionButtonClass = (variant: string = 'primary') => {
-    const baseClass = 'px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center';
+    const baseClass = 'px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 will-change-transform';
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700',
-      secondary: 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-      success: 'bg-green-600 text-white hover:bg-green-700',
-      danger: 'bg-red-600 text-white hover:bg-red-700'
+      primary: 'btn-primary',
+      secondary: 'btn-secondary',
+      success: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:-translate-y-0.5',
+      danger: 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:shadow-lg hover:-translate-y-0.5'
     };
     return `${baseClass} ${variants[variant as keyof typeof variants] || variants.primary}`;
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-md border-l-4 ${stageInfo.color.replace('bg-', 'border-').replace('-100', '-500')} p-6 hover:shadow-lg transition-shadow ${className}`}>
+    <div className={`order-card relative ${className}`} style={{ borderLeft: `4px solid ${stageInfo.color.includes('blue') ? '#3b82f6' : stageInfo.color.includes('purple') ? '#a855f7' : '#10b981'}` }}>
       
       {/* Header */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-2.5">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-base font-bold text-gray-900 mb-0.5">
             Order #{order.invoiceNumber}
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-xs text-gray-600 font-medium">
             {stageInfo.description}
           </p>
         </div>
-        <div className="flex gap-2 items-start">
-          <span className={`px-3 py-1 text-sm font-medium rounded-full ${stageInfo.color}`}>
+        <div className="flex gap-2 items-start flex-wrap justify-end">
+          <span className={`badge text-xs px-2 py-1 ${stageInfo.color}`}>
             {stageInfo.icon} {stageInfo.label}
           </span>
           {/* Payment Status Badge */}
           {order.workflowStage === 'completed' && order.status === 'Pending' && (
-            <span className="px-3 py-1 text-sm font-bold rounded-full bg-red-600 text-white animate-pulse">
+            <span className="badge text-xs px-2 py-1 bg-gradient-to-r from-red-500 to-rose-600 text-white animate-pulse">
               💰 UNPAID
             </span>
           )}
@@ -60,32 +60,32 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
       </div>
 
       {/* Order Details */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         
         {/* Client Info */}
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Client:</span>
-          <span className="font-medium">{order.clientName}</span>
+        <div className="flex justify-between text-xs items-center p-2 bg-gradient-to-r from-cyan-50 to-blue-50 rounded">
+          <span className="text-gray-600 font-medium">Client:</span>
+          <span className="font-bold text-gray-900">{order.clientName}</span>
         </div>
         
         {/* Date */}
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Order Date:</span>
-          <span className="font-medium">{new Date(order.date).toLocaleDateString()}</span>
+        <div className="flex justify-between text-xs items-center p-2 bg-gradient-to-r from-cyan-50 to-blue-50 rounded">
+          <span className="text-gray-600 font-medium">Order Date:</span>
+          <span className="font-bold text-gray-900">{new Date(order.date).toLocaleDateString()}</span>
         </div>
 
         {/* Products */}
         {showDetails !== 'minimal' && (
-          <div className="space-y-2">
-            <span className="text-gray-600 text-sm">Products:</span>
-            <div className="bg-gray-50 rounded p-3 space-y-1 max-h-32 overflow-y-auto">
+          <div className="space-y-1">
+            <span className="text-gray-700 text-xs font-semibold">Products:</span>
+            <div className="glass-card p-2 space-y-1 max-h-32 overflow-y-auto">
               {order.items && order.items.length > 0 ? order.items.map((item, index) => (
-                <div key={index} className="flex justify-between items-center text-sm">
-                  <span className="font-medium">{item.productName}</span>
-                  <span className="text-gray-600">{item.quantity} pcs</span>
+                <div key={index} className="flex justify-between items-center text-xs p-1.5 bg-white/50 rounded hover:bg-white/80 transition-colors">
+                  <span className="font-semibold text-gray-900">{item.productName}</span>
+                  <span className="gradient-text font-bold">{item.quantity} pcs</span>
                 </div>
               )) : (
-                <span className="text-sm text-gray-500">No items loaded</span>
+                <span className="text-xs text-gray-500 italic">No items loaded</span>
               )}
             </div>
           </div>
@@ -93,9 +93,9 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
 
         {/* Total Value */}
         {showDetails === 'full' && (
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Total Value:</span>
-            <span className="font-medium text-green-600">
+          <div className="flex justify-between text-xs items-center p-2 bg-gradient-to-r from-green-50 to-emerald-50 rounded border border-green-200">
+            <span className="text-gray-600 font-medium">Total Value:</span>
+            <span className="font-bold text-sm" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {formatCurrency(order.totalValue)}
             </span>
           </div>
@@ -103,23 +103,23 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
 
         {/* Production Notes */}
         {order.productionNotes && showDetails !== 'minimal' && (
-          <div className="border-t pt-3">
-            <h4 className="text-sm font-medium text-gray-900">Production Notes:</h4>
-            <p className="text-sm text-gray-600 mt-1">{order.productionNotes}</p>
+          <div className="border-t border-gray-200 pt-2">
+            <h4 className="text-xs font-medium text-gray-900">Production Notes:</h4>
+            <p className="text-xs text-gray-600 mt-0.5">{order.productionNotes}</p>
           </div>
         )}
 
         {/* Delivery Notes */}
         {order.deliveryNotes && showDetails !== 'minimal' && (
-          <div className="border-t pt-3">
-            <h4 className="text-sm font-medium text-gray-900">Delivery Notes:</h4>
-            <p className="text-sm text-gray-600 mt-1">{order.deliveryNotes}</p>
+          <div className="border-t border-gray-200 pt-2">
+            <h4 className="text-xs font-medium text-gray-900">Delivery Notes:</h4>
+            <p className="text-xs text-gray-600 mt-0.5">{order.deliveryNotes}</p>
           </div>
         )}
 
         {/* Assigned Driver */}
         {order.assignedDriver && showDetails !== 'minimal' && (
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-xs">
             <span className="text-gray-600">Assigned Driver:</span>
             <span className="font-medium">{order.assignedDriver}</span>
           </div>
@@ -127,8 +127,8 @@ export const UnifiedOrderCard: React.FC<UnifiedOrderCardProps> = ({
 
         {/* Timing Information */}
         {showDetails === 'full' && (
-          <div className="border-t pt-3 space-y-1">
-            <h4 className="text-sm font-medium text-gray-900">Timeline:</h4>
+          <div className="border-t border-gray-200 pt-2 space-y-0.5">
+            <h4 className="text-xs font-medium text-gray-900">Timeline:</h4>
             {order.productionStartTime && (
               <div className="flex justify-between text-xs text-gray-600">
                 <span>Production Started:</span>

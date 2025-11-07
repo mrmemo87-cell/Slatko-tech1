@@ -188,11 +188,11 @@ export const UnifiedAdminPortal: React.FC = () => {
               <div className="text-xs text-purple-500">Per order average</div>
             </div>
             
-            <div className="bg-orange-100 p-6 rounded-lg border border-orange-200">
+            <div className="bg-cyan-100 p-6 rounded-lg border border-cyan-200">
               <div className="text-3xl mb-2">⚙️</div>
-              <div className="text-3xl font-bold text-orange-800">{stats.productionEfficiency.toFixed(1)}%</div>
-              <div className="text-sm text-orange-600 font-medium">Production Efficiency</div>
-              <div className="text-xs text-orange-500">Performance ratio</div>
+              <div className="text-3xl font-bold text-cyan-800">{stats.productionEfficiency.toFixed(1)}%</div>
+              <div className="text-sm text-cyan-600 font-medium">Production Efficiency</div>
+              <div className="text-xs text-cyan-500">Performance ratio</div>
             </div>
           </div>
 

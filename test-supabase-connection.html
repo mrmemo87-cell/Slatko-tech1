@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-box {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        #logs {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 300px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Supabase Connection Diagnostic Tool</h1>
+    
+    <div class="test-box">
+        <h3>1. Basic Connection Test</h3>
+        <button onclick="testBasicConnection()">Test Connection</button>
+        <div id="basic-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h3>2. Auth Test (Sign In)</h3>
+        <input type="email" id="email" placeholder="Email" value="mr.memo87@gmail.com" />
+        <input type="password" id="password" placeholder="Password" />
+        <br>
+        <button onclick="testSignIn()">Test Sign In</button>
+        <div id="auth-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h3>3. Network Diagnostics</h3>
+        <button onclick="testNetwork()">Check Network</button>
+        <div id="network-result"></div>
+    </div>
+
+    <div class="test-box">
+        <h3>Console Logs</h3>
+        <div id="logs"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const supabaseUrl = 'https://wfbvvbqzvolkbktvpnaq.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmYnZ2YnF6dm9sa2JrdHZwbmFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwOTcyNjYsImV4cCI6MjA3NzY3MzI2Nn0.Q27Y-EJy0g2-XvQDXcbgo9K8UxwbBzCrTAkRaSi1NKE';
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        window.supabaseTest = supabase;
+
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            logs.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+
+        window.testBasicConnection = async function() {
+            const resultDiv = document.getElementById('basic-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            log('🔍 Testing basic connection...');
+
+            try {
+                const start = Date.now();
+                const { data, error, count } = await supabase
+                    .from('clients')
+                    .select('*', { count: 'exact', head: true });
+                
+                const elapsed = Date.now() - start;
+
+                if (error) {
+                    resultDiv.innerHTML = `<p class="error">❌ Connection failed: ${error.message}</p>`;
+                    log(`❌ Connection failed: ${error.message}`, 'error');
+                } else {
+                    resultDiv.innerHTML = `<p class="success">✅ Connection successful! (${elapsed}ms) Found ${count} clients</p>`;
+                    log(`✅ Connection successful in ${elapsed}ms`, 'success');
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<p class="error">❌ Exception: ${err.message}</p>`;
+                log(`❌ Exception: ${err.message}`, 'error');
+            }
+        };
+
+        window.testSignIn = async function() {
+            const resultDiv = document.getElementById('auth-result');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                resultDiv.innerHTML = '<p class="error">Please enter email and password</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p>Testing sign in...</p>';
+            log(`🔐 Attempting sign in with: ${email}`);
+
+            try {
+                const start = Date.now();
+                
+                // Add timeout
+                const signInPromise = supabase.auth.signInWithPassword({ email, password });
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout after 10 seconds')), 10000)
+                );
+
+                const res = await Promise.race([signInPromise, timeoutPromise]);
+                const elapsed = Date.now() - start;
+
+                log(`⏱️ Sign in took ${elapsed}ms`);
+
+                if (res.error) {
+                    resultDiv.innerHTML = `<p class="error">❌ Auth error: ${res.error.message}</p>`;
+                    log(`❌ Auth error: ${res.error.message}`, 'error');
+                    log(`Error details: ${JSON.stringify(res.error, null, 2)}`);
+                } else if (res.data?.session) {
+                    resultDiv.innerHTML = `<p class="success">✅ Sign in successful! User: ${res.data.user.email}</p>`;
+                    log(`✅ Sign in successful! User: ${res.data.user.email}`, 'success');
+                    log(`Session: ${JSON.stringify(res.data.session, null, 2)}`);
+                } else {
+                    resultDiv.innerHTML = '<p class="warning">⚠️ No error but no session returned</p>';
+                    log('⚠️ No error but no session returned', 'warning');
+                }
+            } catch (err) {
+                resultDiv.innerHTML = `<p class="error">❌ Exception: ${err.message}</p>`;
+                log(`❌ Exception: ${err.message}`, 'error');
+            }
+        };
+
+        window.testNetwork = async function() {
+            const resultDiv = document.getElementById('network-result');
+            resultDiv.innerHTML = '<p>Checking network...</p>';
+            log('🌐 Testing network connectivity...');
+
+            const tests = [
+                { name: 'Supabase API', url: supabaseUrl },
+                { name: 'Google DNS', url: 'https://8.8.8.8' },
+                { name: 'Cloudflare DNS', url: 'https://1.1.1.1' }
+            ];
+
+            let html = '';
+            for (const test of tests) {
+                try {
+                    const start = Date.now();
+                    const response = await fetch(test.url, { method: 'HEAD', mode: 'no-cors' });
+                    const elapsed = Date.now() - start;
+                    html += `<p class="success">✅ ${test.name}: OK (${elapsed}ms)</p>`;
+                    log(`✅ ${test.name}: OK (${elapsed}ms)`, 'success');
+                } catch (err) {
+                    html += `<p class="error">❌ ${test.name}: Failed</p>`;
+                    log(`❌ ${test.name}: Failed - ${err.message}`, 'error');
+                }
+            }
+            resultDiv.innerHTML = html;
+        };
+
+        // Auto-run basic connection test on load
+        log('🚀 Diagnostic tool loaded');
+        log(`📍 Supabase URL: ${supabaseUrl}`);
+        log(`🔑 API Key length: ${supabaseAnonKey.length} chars`);
+    </script>
+</body>
+</html>

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
 import { showToast } from '../../utils/toast';
 
 export const UnifiedProductionPortal: React.FC = () => {
+  console.log('🏭🏭🏭 UnifiedProductionPortal component RENDERING');
   const { user } = useAuth();
   const [orders, setOrders] = useState<{
     queue: WorkflowOrder[];
@@ -18,6 +19,45 @@ export const UnifiedProductionPortal: React.FC = () => {
     id: user?.id || 'unknown',
     name: user?.user_metadata?.full_name || user?.email || 'Worker'
   };
+
+  // Calculate summary for current tab
+  const getTabSummary = () => {
+    const tabOrders = activeTab === 'queue' ? orders.queue : activeTab === 'production' ? orders.inProduction : orders.readyForPickup;
+    const itemTotals: Record<string, number> = {};
+    
+    tabOrders.forEach(order => {
+      order.items?.forEach(item => {
+        itemTotals[item.productName] = (itemTotals[item.productName] || 0) + item.quantity;
+      });
+    });
+    
+    return {
+      tabOrders,
+      itemTotals,
+      totalItems: Object.values(itemTotals).reduce((sum, qty) => sum + qty, 0)
+    };
+  };
+
+  const tabSummary = useMemo(() => getTabSummary(), [orders, activeTab]);
+  
+  // Log only when tab summary changes
+  useMemo(() => {
+    if (tabSummary.tabOrders.length > 0) {
+      console.log('📊 First order item sample:', {
+        invoiceNumber: tabSummary.tabOrders[0].invoiceNumber,
+        itemCount: tabSummary.tabOrders[0].items?.length,
+        firstItem: tabSummary.tabOrders[0].items?.[0]
+      });
+    }
+    
+    console.log('📊 Tab Summary Updated:', { 
+      activeTab, 
+      tabOrdersCount: tabSummary.tabOrders.length, 
+      productsCount: Object.keys(tabSummary.itemTotals).length,
+      itemTotals: tabSummary.itemTotals,
+      shouldShowTable: tabSummary.tabOrders.length > 0
+    });
+  }, [tabSummary]);
 
   useEffect(() => {
     loadProductionData();
@@ -37,7 +77,13 @@ export const UnifiedProductionPortal: React.FC = () => {
       console.log('🏭 Production Portal Data:', {
         queueCount: productionOrders.queue.length,
         inProductionCount: productionOrders.inProduction.length,
-        readyCount: productionOrders.readyForPickup.length
+        readyCount: productionOrders.readyForPickup.length,
+        queueDetails: productionOrders.queue.slice(0, 2).map(o => ({
+          id: o.id,
+          invoiceNumber: o.invoiceNumber,
+          itemCount: o.items?.length || 0,
+          items: o.items?.slice(0, 2)
+        }))
       });
       
     } catch (error) {
@@ -103,121 +149,131 @@ export const UnifiedProductionPortal: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Loading production data...</span>
+      <div className="flex items-center justify-center h-screen">
+        <div className="glass-card p-8 flex flex-col items-center gap-4 animate-scale-in">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-cyan-500 border-t-transparent"></div>
+          <span className="text-gray-700 font-medium">Loading production data...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            👨‍🍳 Production Portal
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Kitchen workflow management - Orders ready for preparation
-          </p>
+    <div className="min-h-screen animate-fade-in">
+      {/* Enhanced Header with Glassmorphism */}
+      <div className="glass-header sticky top-0 z-40 py-6 px-6 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold gradient-text flex items-center gap-3">
+                � Production Portal
+              </h1>
+              <p className="text-gray-600 mt-1 font-medium">Kitchen workflow management - Orders ready for preparation</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="badge badge-worker animate-float">
+                👨‍🍳 {currentUser.name}
+              </div>
+              <button
+                onClick={loadProductionData}
+                className="btn-primary flex items-center gap-2"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={loadProductionData}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-        >
-          🔄 Refresh
-        </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
-        <button
-          onClick={() => setActiveTab('queue')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'queue'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          ⏳ Production Queue ({counts.queue})
-        </button>
-        <button
-          onClick={() => setActiveTab('production')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'production'
-              ? 'bg-white text-orange-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          👨‍🍳 Cooking Now ({counts.production})
-        </button>
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'completed'
-              ? 'bg-white text-green-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          ✅ Ready for Pickup ({counts.completed})
-        </button>
-      </div>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Enhanced Tab Navigation */}
+        <div className="glass-card p-2 flex gap-2 mb-8 animate-slide-in">
+          <button
+            onClick={() => setActiveTab('queue')}
+            className={`flex-1 py-3 px-6 rounded-lg text-sm font-semibold transition-all duration-200 will-change-transform ${
+              activeTab === 'queue'
+                ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg transform scale-105'
+                : 'text-gray-600 hover:bg-white/50 hover:scale-102'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span>⏳</span>
+              <span>Production Queue</span>
+              <span className="badge bg-white/30 text-inherit px-2 py-1 text-xs">{counts.queue}</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('production')}
+            className={`flex-1 py-3 px-6 rounded-lg text-sm font-semibold transition-all duration-200 will-change-transform ${
+              activeTab === 'production'
+                ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white shadow-lg transform scale-105'
+                : 'text-gray-600 hover:bg-white/50 hover:scale-102'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span>👨‍🍳</span>
+              <span>Cooking Now</span>
+              <span className="badge bg-white/30 text-inherit px-2 py-1 text-xs">{counts.production}</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`flex-1 py-3 px-6 rounded-lg text-sm font-semibold transition-all duration-200 will-change-transform ${
+              activeTab === 'completed'
+                ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg transform scale-105'
+                : 'text-gray-600 hover:bg-white/50 hover:scale-102'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span>✅</span>
+              <span>Ready for Pickup</span>
+              <span className="badge bg-white/30 text-inherit px-2 py-1 text-xs">{counts.completed}</span>
+            </div>
+          </button>
+        </div> {/* Close glass-card tabs */}
 
       {/* Orders Grid */}
       <div className="space-y-6">
         
-        {/* Items Summary Table - Only for Queue Tab */}
-        {activeTab === 'queue' && orders.queue.length > 0 && (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-lg p-6 shadow-md">
-            <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
-              📋 Total Items to Prepare
-            </h3>
-            <div className="bg-white rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-amber-100">
-                  <tr>
-                    <th className="text-left p-3 font-bold text-amber-900">Product</th>
-                    <th className="text-right p-3 font-bold text-amber-900">Total Quantity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    // Calculate totals
-                    const itemTotals: Record<string, number> = {};
-                    orders.queue.forEach(order => {
-                      order.items?.forEach(item => {
-                        itemTotals[item.productName] = (itemTotals[item.productName] || 0) + item.quantity;
-                      });
-                    });
-                    
-                    const totalItems = Object.values(itemTotals).reduce((sum, qty) => sum + qty, 0);
-                    
-                    return (
-                      <>
-                        {Object.entries(itemTotals)
-                          .sort(([, a], [, b]) => b - a) // Sort by quantity descending
-                          .map(([productName, quantity], index) => (
-                            <tr key={productName} className={index % 2 === 0 ? 'bg-white' : 'bg-amber-50'}>
-                              <td className="p-3 text-gray-900 font-medium">{productName}</td>
-                              <td className="p-3 text-right font-bold text-amber-700">{quantity} pcs</td>
-                            </tr>
-                          ))}
-                        <tr className="bg-gradient-to-r from-amber-200 to-orange-200 border-t-2 border-amber-300">
-                          <td className="p-3 font-bold text-amber-900">TOTAL ITEMS</td>
-                          <td className="p-3 text-right text-xl font-bold text-amber-900">{totalItems} pcs</td>
-                        </tr>
-                      </>
-                    );
-                  })()}
-                </tbody>
-              </table>
+        {/* Enhanced Items Summary Table */}
+        {tabSummary.tabOrders.length > 0 && (
+          <div className="summary-table animate-scale-in">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                📋 Total Items to Prepare
+              </h3>
+              <p className="text-white/80 text-sm">
+                {activeTab === 'queue' ? 'Queue' : activeTab === 'production' ? 'Cooking' : 'Ready'} - All orders combined
+              </p>
             </div>
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="text-left">Product</th>
+                  <th className="text-right">Total Quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(tabSummary.itemTotals)
+                  .sort(([, a], [, b]) => (b as number) - (a as number))
+                  .map(([productName, quantity]) => (
+                    <tr key={productName}>
+                      <td className="font-semibold text-gray-900">{productName}</td>
+                      <td className="text-right font-bold gradient-text text-lg">{quantity} pcs</td>
+                    </tr>
+                  ))}
+                <tr className="border-t-2 border-cyan-300 bg-gradient-to-r from-cyan-100 to-purple-100">
+                  <td className="font-bold text-cyan-900 text-lg">TOTAL ITEMS</td>
+                  <td className="text-right text-2xl font-bold gradient-text">{tabSummary.totalItems} pcs</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
 
-        {/* Orders Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Orders Grid with Enhanced Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         
         {/* Production Queue */}
         {activeTab === 'queue' && orders.queue.map((order) => (
@@ -263,32 +319,33 @@ export const UnifiedProductionPortal: React.FC = () => {
           />
         ))}
         </div>
-      </div>
 
-      {/* Empty States */}
+      {/* Empty States with Glassmorphism */}
       {activeTab === 'queue' && orders.queue.length === 0 && (
-        <div className="text-center py-12">
+        <div className="glass-card p-12 text-center animate-scale-in">
           <div className="text-6xl mb-4">⏳</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No orders in production queue</h3>
-          <p className="text-gray-500">New orders will appear here when they're ready for production.</p>
+          <h3 className="text-xl font-bold gradient-text mb-2">No orders in production queue</h3>
+          <p className="text-gray-600">New orders will appear here when they're ready for production.</p>
         </div>
       )}
 
       {activeTab === 'production' && orders.inProduction.length === 0 && (
-        <div className="text-center py-12">
+        <div className="glass-card p-12 text-center animate-scale-in">
           <div className="text-6xl mb-4">👨‍🍳</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Nothing cooking right now</h3>
-          <p className="text-gray-500">Start production on orders from the queue to begin cooking.</p>
+          <h3 className="text-xl font-bold gradient-text mb-2">Nothing cooking right now</h3>
+          <p className="text-gray-600">Start production on orders from the queue to begin cooking.</p>
         </div>
       )}
 
       {activeTab === 'completed' && orders.readyForPickup.length === 0 && (
-        <div className="text-center py-12">
+        <div className="glass-card p-12 text-center animate-scale-in">
           <div className="text-6xl mb-4">✅</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No orders ready for pickup</h3>
-          <p className="text-gray-500">Completed orders will appear here for delivery pickup.</p>
+          <h3 className="text-xl font-bold gradient-text mb-2">No orders ready for pickup</h3>
+          <p className="text-gray-600">Completed orders will appear here for delivery pickup.</p>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 };

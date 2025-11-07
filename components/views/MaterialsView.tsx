@@ -79,25 +79,57 @@ export const MaterialsView: React.FC<MaterialsViewProps> = ({ t, showToast }) =>
 
   const filteredMaterials = materials.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center relative">
+        <div className="absolute inset-0 -z-20">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-purple-600 to-pink-600 animate-gradient-x"></div>
+          <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/40 via-purple-500/40 to-cyan-500/40 animate-gradient-y"></div>
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-cyan-400 border-t-transparent shadow-lg mb-4"></div>
+          <p className="text-white font-semibold drop-shadow-lg">Loading materials...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen relative overflow-hidden px-4 py-8 sm:px-6 lg:px-8">
+      {/* DRAMATIC Gradient Background */}
+      <div className="absolute inset-0 -z-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-purple-600 to-pink-600 animate-gradient-x"></div>
+        <div className="absolute inset-0 bg-gradient-to-tl from-pink-500/40 via-purple-500/40 to-cyan-500/40 animate-gradient-y"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-purple-900/20 to-black/40"></div>
+      </div>
+
+      {/* Animated Mesh Gradient Orbs */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-radial from-cyan-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-slow"></div>
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-radial from-pink-400/20 via-transparent to-transparent rounded-full blur-3xl animate-spin-reverse"></div>
+      </div>
+
+      <div className="relative z-10 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">{t.materials.title}</h1>
+        <h1 className="text-4xl font-black bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,208,232,0.4)]">{t.materials.title}</h1>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          className="flex items-center backdrop-blur-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-[0_8px_32px_rgba(0,150,200,0.4)] border border-white/20"
         >
           <PlusIcon className="mr-2" />
           {t.materials.newMaterial}
         </button>
       </div>
       
-      <input
-        type="text"
-        placeholder={t.common.search}
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full p-2 border border-slate-300 rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+      {/* Search Bar */}
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 to-pink-400 rounded-2xl blur opacity-40 group-hover:opacity-60 transition duration-500"></div>
+        <input
+          type="text"
+          placeholder={t.common.search}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="relative w-full px-5 py-3 border-0 text-gray-900 dark:text-white rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-lg placeholder-gray-400"
       />
 
       <div className="bg-white dark:bg-slate-800 shadow-md rounded-lg overflow-hidden">
@@ -208,6 +240,8 @@ export const MaterialsView: React.FC<MaterialsViewProps> = ({ t, showToast }) =>
         material={editingMaterial}
         t={t}
       />
+    </div>
+      </div>
     </div>
   );
 };

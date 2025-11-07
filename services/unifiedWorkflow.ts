@@ -226,10 +226,10 @@ export class UnifiedWorkflowService {
 
       if (Object.keys(updateData).length > 0) {
         updateData.updated_at = now;
-        const { error } = await supabase
+        const { error } = await (supabase
           .from('deliveries')
           .update(updateData)
-          .eq('id', orderId);
+          .eq('id', orderId) as any);
 
         if (error) throw error;
       }
@@ -245,13 +245,13 @@ export class UnifiedWorkflowService {
   // Assign driver to order
   async assignDriver(orderId: string, driverId: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('deliveries')
         .update({
           assigned_driver: driverId,
           updated_at: new Date().toISOString()
         })
-        .eq('id', orderId);
+        .eq('id', orderId) as any);
 
       if (error) throw error;
       await this.loadOrders();
@@ -264,13 +264,13 @@ export class UnifiedWorkflowService {
   // Update production notes
   async updateProductionNotes(orderId: string, notes: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('deliveries')
         .update({
           production_notes: notes,
           updated_at: new Date().toISOString()
         })
-        .eq('id', orderId);
+        .eq('id', orderId) as any);
 
       if (error) throw error;
       await this.loadOrders();
@@ -283,13 +283,13 @@ export class UnifiedWorkflowService {
   // Update delivery notes
   async updateDeliveryNotes(orderId: string, notes: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('deliveries')
         .update({
           delivery_notes: notes,
           updated_at: new Date().toISOString()
         })
-        .eq('id', orderId);
+        .eq('id', orderId) as any);
 
       if (error) throw error;
       await this.loadOrders();

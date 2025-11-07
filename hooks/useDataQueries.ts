@@ -16,7 +16,17 @@ export const QUERY_KEYS = {
 export function useProducts() {
   return useQuery({
     queryKey: [QUERY_KEYS.PRODUCTS],
-    queryFn: () => supabaseApi.getProducts(),
+    queryFn: async () => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Products query timeout')), 8000)
+      );
+      try {
+        return await Promise.race([supabaseApi.getProducts(), timeout]);
+      } catch (error) {
+        console.error('❌ Products query failed:', error);
+        throw error;
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -60,7 +70,17 @@ export function useDeleteProduct() {
 export function useClients() {
   return useQuery({
     queryKey: [QUERY_KEYS.CLIENTS],
-    queryFn: () => supabaseApi.getClients(),
+    queryFn: async () => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Clients query timeout')), 8000)
+      );
+      try {
+        return await Promise.race([supabaseApi.getClients(), timeout]);
+      } catch (error) {
+        console.error('❌ Clients query failed:', error);
+        throw error;
+      }
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -104,7 +124,17 @@ export function useDeleteClient() {
 export function useMaterials() {
   return useQuery({
     queryKey: [QUERY_KEYS.MATERIALS],
-    queryFn: () => supabaseApi.getMaterials(),
+    queryFn: async () => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Materials query timeout')), 8000)
+      );
+      try {
+        return await Promise.race([supabaseApi.getMaterials(), timeout]);
+      } catch (error) {
+        console.error('❌ Materials query failed:', error);
+        throw error;
+      }
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
@@ -148,7 +178,17 @@ export function useDeleteMaterial() {
 export function useProductionBatches() {
   return useQuery({
     queryKey: [QUERY_KEYS.PRODUCTION_BATCHES],
-    queryFn: () => supabaseApi.getProductionBatches(),
+    queryFn: async () => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Production batches query timeout')), 8000)
+      );
+      try {
+        return await Promise.race([supabaseApi.getProductionBatches(), timeout]);
+      } catch (error) {
+        console.error('❌ Production batches query failed:', error);
+        throw error;
+      }
+    },
     staleTime: 2 * 60 * 1000, // 2 minutes for production data
     gcTime: 5 * 60 * 1000,
   });
@@ -183,7 +223,17 @@ export function useDeleteProductionBatch() {
 export function useDeliveries() {
   return useQuery({
     queryKey: [QUERY_KEYS.DELIVERIES],
-    queryFn: () => supabaseApi.getDeliveries(),
+    queryFn: async () => {
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Deliveries query timeout')), 8000)
+      );
+      try {
+        return await Promise.race([supabaseApi.getDeliveries(), timeout]);
+      } catch (error) {
+        console.error('❌ Deliveries query failed:', error);
+        throw error;
+      }
+    },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
   });
