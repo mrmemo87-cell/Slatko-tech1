@@ -97,7 +97,7 @@ const AppContent: React.FC = () => {
     return result;
   }, [user?.role, user?.user_metadata, user?.app_metadata]);
 
-  // Safety timeout for loading state - if stuck for 5 seconds, force proceed
+  // Safety timeout for loading state - if stuck for 3 seconds, force proceed
   useEffect(() => {
     if (!loading) {
       setAuthLoadingTimeout(false);
@@ -105,9 +105,9 @@ const AppContent: React.FC = () => {
     }
 
     const timeout = setTimeout(() => {
-      console.warn('⏱️ Auth loading timeout (5s) - forcing UI to render');
+      console.warn('⏱️ Auth loading timeout (3s) - forcing UI');
       setAuthLoadingTimeout(true);
-    }, 5000); // Reduced from 10000 to 5000
+    }, 3000); // Reduced from 5000 to 3000
 
     return () => clearTimeout(timeout);
   }, [loading]);
@@ -653,9 +653,6 @@ const AppContent: React.FC = () => {
 
         {/* Quick Order Floating Button */}
         <QuickOrderButton t={t} showToast={showToast} />
-
-        {/* Mobile Tab Navigation - for phones < 768px */}
-        <MobileTabNav currentView={view} onViewChange={setView} isDarkMode={isDarkMode} />
 
         {/* Mobile overlay */}
         {isMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={() => setIsMenuOpen(false)} />}

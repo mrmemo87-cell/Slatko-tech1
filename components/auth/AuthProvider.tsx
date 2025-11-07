@@ -43,15 +43,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Robust session check: race supabase.getSession against a timeout so we don't hang
     const sessionCheck = async () => {
-      console.log('🔐🔐🔐 SESSION CHECK STARTED 🔐🔐🔐');
-      const TIMEOUT_MS = 2000; // Fast timeout - 2 seconds
+      console.log('🔐 SESSION CHECK STARTED');
+      const TIMEOUT_MS = 1000; // Ultra-fast timeout - 1 second
       try {
         const resultPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ _timedOut: true }), TIMEOUT_MS));
         const res: any = await Promise.race([resultPromise, timeoutPromise]);
 
         if (res && res._timedOut) {
-          console.warn(`⚠️ Session check timed out after ${TIMEOUT_MS}ms - showing login form`);
+          console.warn(`⚠️ Session timed out after ${TIMEOUT_MS}ms - showing login`);
           if (isMounted) {
             setLoading(false);
             setUser(null);

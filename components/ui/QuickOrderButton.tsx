@@ -23,6 +23,11 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [loadingLastOrder, setLoadingLastOrder] = useState(false);
 
+  // Draggable state
+  const [position, setPosition] = useState({ x: window.innerWidth - 120, y: window.innerHeight - 120 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   useEffect(() => {
     if (isOpen) {
       loadData();
@@ -42,6 +47,65 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
+
+  // Dragging handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setIsDragging(true);
+    setDragStart({
+      x: touch.clientX - position.x,
+      y: touch.clientY - position.y
+    });
+  };
+
+  useEffect(() => {
+    const handleMove = (clientX: number, clientY: number) => {
+      if (!isDragging) return;
+      
+      const newX = clientX - dragStart.x;
+      const newY = clientY - dragStart.y;
+      
+      // Keep button within viewport
+      const maxX = window.innerWidth - 100;
+      const maxY = window.innerHeight - 100;
+      
+      setPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY))
+      });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const handleEnd = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('touchmove', handleTouchMove);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchend', handleEnd);
+
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('mouseup', handleEnd);
+        window.removeEventListener('touchend', handleEnd);
+      };
+    }
+  }, [isDragging, dragStart]);
 
   const loadData = async () => {
     try {
@@ -266,18 +330,29 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
 
   return (
     <>
-      {/* AWESOME Floating Action Button with "Add Order" text */}
+      {/* DRAGGABLE Floating Action Button */}
       <button
-        onClick={handleOpen}
-        className="fixed bottom-6 right-6 z-50 group"
-        style={{ perspective: '1000px' }}
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        onClick={(e) => {
+          if (!isDragging) {
+            handleOpen();
+          }
+        }}
+        className="fixed z-50 group cursor-move"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          perspective: '1000px',
+          touchAction: 'none'
+        }}
       >
         {/* Multi-layer glow background */}
         <div className="absolute inset-0 w-24 h-24 -bottom-2 -right-2 bg-gradient-to-br from-cyan-400 to-pink-500 rounded-full blur-2xl opacity-60 group-hover:opacity-80 transition-opacity duration-300 animate-pulse"></div>
         <div className="absolute inset-0 w-24 h-24 -bottom-1 -right-1 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-300 animate-pulse animation-delay-1000"></div>
         
         {/* Main Button */}
-        <div className="relative w-24 h-24 bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 active:scale-95 group-hover:shadow-pink-500/50 group-hover:shadow-2xl overflow-hidden">
+        <div className={`relative w-24 h-24 bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${isDragging ? 'scale-110' : 'group-hover:scale-110'} active:scale-95 group-hover:shadow-pink-500/50 group-hover:shadow-2xl overflow-hidden`}>
           {/* Shimmer effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-30 transition-opacity duration-300 rounded-full" style={{ animation: 'shimmer 2s infinite' }}></div>
           
@@ -285,10 +360,10 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
           <div className="absolute inset-1 bg-gradient-to-br from-cyan-400 to-pink-400 rounded-full opacity-40"></div>
           
           {/* Content */}
-          <div className="relative flex flex-col items-center justify-center text-white z-10">
+          <div className="relative flex flex-col items-center justify-center text-white z-10 pointer-events-none">
             <div className="text-3xl font-bold mb-1 drop-shadow-lg">➕</div>
             <div className="text-xs font-bold text-center leading-tight drop-shadow-lg">
-              ADD<br/>ORDER
+              {isDragging ? 'MOVE' : 'ADD'}<br/>{isDragging ? 'ME' : 'ORDER'}
             </div>
           </div>
           

@@ -1,20 +1,20 @@
 /* Mobile Optimization CSS for Slatko App */
 
-/* CRITICAL: Hide hamburger menu on mobile */
+/* Make sidebar work on mobile - keep it visible but collapsible */
 @media (max-width: 767px) {
-  /* Hide the entire sidebar */
-  aside,
-  [class*="sidebar"],
-  .glass-sidebar {
-    display: none !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
+  /* Sidebar is toggleable via hamburger menu */
+  aside {
+    position: fixed;
+    left: -100%;
+    transition: left 0.3s ease;
+    z-index: 50;
+    height: 100vh;
+    width: 280px;
   }
 
-  /* Remove margin/padding that sidebar creates */
-  main, .main-content, [role="main"] {
-    margin-left: 0 !important;
+  /* Show sidebar when menu is open */
+  aside.menu-open {
+    left: 0;
   }
 }
 
