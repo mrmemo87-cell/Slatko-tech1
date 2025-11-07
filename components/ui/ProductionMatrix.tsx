@@ -1,387 +1,444 @@
 import React, { useMemo, useState } from 'react';
-import { Delivery, Product, Client } from '../../types';
-import { supabaseApi } from '../../services/supabase-api';
+import type { WorkflowOrder } from '../../services/unifiedWorkflow';
 
 interface ProductionMatrixProps {
-  deliveries: Delivery[];
-  products: Product[];
-  clients: Client[];
-  t: any;
+  queue: WorkflowOrder[];
+  inProduction: WorkflowOrder[];
+  readyForPickup: WorkflowOrder[];
   showToast: (message: string, type?: 'success' | 'error') => void;
-  onProductionStarted?: () => void;
+  onStartClient: (clientId: string, orders: WorkflowOrder[]) => Promise<void>;
+  onMarkReadyClient: (clientId: string, orders: WorkflowOrder[]) => Promise<void>;
+  onStartAll: (orders: WorkflowOrder[]) => Promise<void>;
+  onMarkAllReady: (orders: WorkflowOrder[]) => Promise<void>;
 }
 
-interface MatrixData {
+type StageKey = 'queue' | 'cooking' | 'ready';
+
+interface StageCounts {
+  queue: number;
+  cooking: number;
+  ready: number;
+}
+
+interface ClientBucket {
+  clientId: string;
+  clientName: string;
+  queueOrders: WorkflowOrder[];
+  inProductionOrders: WorkflowOrder[];
+  readyOrders: WorkflowOrder[];
+}
+
+interface MatrixRow {
   productId: string;
   productName: string;
-  clientQuantities: Record<string, number>; // clientId -> quantity
-  totalQuantity: number;
+  clientStages: Record<string, StageCounts>;
+  totals: StageCounts & { total: number };
 }
 
+const STAGE_LABELS: Record<StageKey, string> = {
+  queue: 'Queue',
+  cooking: 'Cooking',
+  ready: 'Ready'
+};
+
+const EMPTY_COUNTS: StageCounts = { queue: 0, cooking: 0, ready: 0 };
+
+const sumStageCounts = (counts: StageCounts) => counts.queue + counts.cooking + counts.ready;
+
 export const ProductionMatrix: React.FC<ProductionMatrixProps> = ({
-  deliveries,
-  products,
-  clients,
-  t,
+  queue,
+  inProduction,
+  readyForPickup,
   showToast,
-  onProductionStarted
+  onStartClient,
+  onMarkReadyClient,
+  onStartAll,
+  onMarkAllReady
 }) => {
-  const [startingProduction, setStartingProduction] = useState<Record<string, boolean>>({});
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    // Default to today
-    return new Date().toISOString().split('T')[0];
+  const [clientLoading, setClientLoading] = useState<Record<string, { start?: boolean; ready?: boolean }>>({});
+  const [globalLoading, setGlobalLoading] = useState<{ startAll: boolean; readyAll: boolean }>({
+    startAll: false,
+    readyAll: false
   });
 
-  // Get pending deliveries for selected date
-  const dailyDeliveries = useMemo(() => {
-    return deliveries.filter(d => 
-      d.date === selectedDate && 
-      d.status === 'Pending'
-    );
-  }, [deliveries, selectedDate]);
+  const clientBuckets = useMemo(() => {
+    const map = new Map<string, ClientBucket>();
 
-  // Get unique clients with orders for this date
-  const activeClients = useMemo(() => {
-    const clientIds = new Set(dailyDeliveries.map(d => d.clientId));
-    return clients
-      .filter(c => clientIds.has(c.id))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [dailyDeliveries, clients]);
+    const ensureEntry = (order: WorkflowOrder) => {
+      const existing = map.get(order.clientId);
+      if (existing) return existing;
+      const entry: ClientBucket = {
+        clientId: order.clientId,
+        clientName: order.clientName || 'Unknown Client',
+        queueOrders: [],
+        inProductionOrders: [],
+        readyOrders: []
+      };
+      map.set(order.clientId, entry);
+      return entry;
+    };
 
-  // Build the matrix data
-  const matrixData = useMemo<MatrixData[]>(() => {
-    const productMap = new Map<string, MatrixData>();
+    queue.forEach(order => ensureEntry(order).queueOrders.push(order));
+    inProduction.forEach(order => ensureEntry(order).inProductionOrders.push(order));
+    readyForPickup.forEach(order => ensureEntry(order).readyOrders.push(order));
 
-    // Initialize with all products that appear in orders
-    dailyDeliveries.forEach(delivery => {
-      delivery.items?.forEach(item => {
-        if (!productMap.has(item.productId)) {
-          const product = products.find(p => p.id === item.productId);
-          if (product) {
-            productMap.set(item.productId, {
+    return Array.from(map.values()).sort((a, b) => a.clientName.localeCompare(b.clientName));
+  }, [queue, inProduction, readyForPickup]);
+
+  const matrixRows = useMemo<MatrixRow[]>(() => {
+    const productMap = new Map<string, MatrixRow>();
+
+    const addOrders = (orders: WorkflowOrder[], stage: StageKey) => {
+      orders.forEach(order => {
+        order.items?.forEach(item => {
+          let row = productMap.get(item.productId);
+          if (!row) {
+            row = {
               productId: item.productId,
-              productName: product.name,
-              clientQuantities: {},
-              totalQuantity: 0
-            });
+              productName: item.productName || 'Unknown Product',
+              clientStages: {},
+              totals: { queue: 0, cooking: 0, ready: 0, total: 0 }
+            };
+            productMap.set(item.productId, row);
           }
-        }
 
-        const matrixEntry = productMap.get(item.productId);
-        if (matrixEntry) {
-          if (!matrixEntry.clientQuantities[delivery.clientId]) {
-            matrixEntry.clientQuantities[delivery.clientId] = 0;
-          }
-          matrixEntry.clientQuantities[delivery.clientId] += item.quantity;
-          matrixEntry.totalQuantity += item.quantity;
-        }
+          const clientCounts = row.clientStages[order.clientId] || { ...EMPTY_COUNTS };
+          clientCounts[stage] += item.quantity;
+          row.clientStages[order.clientId] = clientCounts;
+
+          row.totals[stage] += item.quantity;
+          row.totals.total += item.quantity;
+        });
+      });
+    };
+
+    addOrders(queue, 'queue');
+    addOrders(inProduction, 'cooking');
+    addOrders(readyForPickup, 'ready');
+
+    return Array.from(productMap.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+  }, [queue, inProduction, readyForPickup]);
+
+  const grandTotals = useMemo(() => {
+    return matrixRows.reduce(
+      (acc, row) => {
+        acc.queue += row.totals.queue;
+        acc.cooking += row.totals.cooking;
+        acc.ready += row.totals.ready;
+        acc.total += row.totals.total;
+        return acc;
+      },
+      { queue: 0, cooking: 0, ready: 0, total: 0 }
+    );
+  }, [matrixRows]);
+
+  const clientTotals = useMemo(() => {
+    const totals: Record<string, { queue: number; cooking: number; ready: number; total: number }> = {};
+    clientBuckets.forEach(client => {
+      totals[client.clientId] = { queue: 0, cooking: 0, ready: 0, total: 0 };
+    });
+
+    matrixRows.forEach(row => {
+      clientBuckets.forEach(client => {
+        const counts = row.clientStages[client.clientId];
+        if (!counts) return;
+        totals[client.clientId].queue += counts.queue;
+        totals[client.clientId].cooking += counts.cooking;
+        totals[client.clientId].ready += counts.ready;
+        totals[client.clientId].total += sumStageCounts(counts);
       });
     });
 
-    return Array.from(productMap.values()).sort((a, b) => 
-      a.productName.localeCompare(b.productName)
-    );
-  }, [dailyDeliveries, products]);
+    return totals;
+  }, [matrixRows, clientBuckets]);
 
-  // Handle "Start Cooking" for a specific client
-  const handleStartCooking = async (clientId: string) => {
-    const client = clients.find(c => c.id === clientId);
-    if (!client) return;
+  const queueOrdersAll = useMemo(() => clientBuckets.flatMap(client => client.queueOrders), [clientBuckets]);
+  const inProductionOrdersAll = useMemo(() => clientBuckets.flatMap(client => client.inProductionOrders), [clientBuckets]);
 
+  const handleClientStart = async (clientId: string) => {
+    const bucket = clientBuckets.find(c => c.clientId === clientId);
+    if (!bucket) {
+      showToast('Client not found for production start', 'error');
+      return;
+    }
+    if (bucket.queueOrders.length === 0) {
+      showToast('No orders waiting for this client', 'error');
+      return;
+    }
+
+    setClientLoading(prev => ({ ...prev, [clientId]: { ...prev[clientId], start: true } }));
     try {
-      setStartingProduction(prev => ({ ...prev, [clientId]: true }));
-
-      // Get all products this client needs
-      const clientProducts = matrixData
-        .filter(row => row.clientQuantities[clientId] > 0)
-        .map(row => ({
-          productId: row.productId,
-          productName: row.productName,
-          quantity: row.clientQuantities[clientId]
-        }));
-
-      if (clientProducts.length === 0) {
-        showToast('No products to cook for this client', 'error');
-        return;
-      }
-
-      // Create production batches for each product
-      const batchPromises = clientProducts.map(async (item) => {
-        return await supabaseApi.createProductionBatch({
-          productId: item.productId,
-          quantity: item.quantity,
-          date: selectedDate,
-          status: 'In Progress',
-          notes: `For ${client.name} - ${selectedDate}`
-        });
-      });
-
-      await Promise.all(batchPromises);
-
-      showToast(
-        `✅ Started cooking ${clientProducts.length} products for ${client.name}!`,
-        'success'
-      );
-
-      // Notify parent to refresh data
-      if (onProductionStarted) {
-        onProductionStarted();
-      }
+      await onStartClient(clientId, bucket.queueOrders);
     } catch (error) {
-      console.error('Error starting production:', error);
-      showToast('Error starting production', 'error');
+      console.error('Error starting production for client:', error);
+      showToast('Error starting production for client', 'error');
     } finally {
-      setStartingProduction(prev => ({ ...prev, [clientId]: false }));
+      setClientLoading(prev => ({ ...prev, [clientId]: { ...prev[clientId], start: false } }));
     }
   };
 
-  // Handle "Start All" - cook everything for all clients
-  const handleStartAllCooking = async () => {
+  const handleClientReady = async (clientId: string) => {
+    const bucket = clientBuckets.find(c => c.clientId === clientId);
+    if (!bucket) {
+      showToast('Client not found for completion', 'error');
+      return;
+    }
+    if (bucket.inProductionOrders.length === 0) {
+      showToast('No orders cooking for this client', 'error');
+      return;
+    }
+
+    setClientLoading(prev => ({ ...prev, [clientId]: { ...prev[clientId], ready: true } }));
     try {
-      setStartingProduction({ all: true });
-
-      const allBatches = matrixData.map(async (row) => {
-        return await supabaseApi.createProductionBatch({
-          productId: row.productId,
-          quantity: row.totalQuantity,
-          date: selectedDate,
-          status: 'In Progress',
-          notes: `All clients - ${selectedDate}`
-        });
-      });
-
-      await Promise.all(allBatches);
-
-      showToast(
-        `✅ Started cooking ${matrixData.length} products for all clients!`,
-        'success'
-      );
-
-      if (onProductionStarted) {
-        onProductionStarted();
-      }
+      await onMarkReadyClient(clientId, bucket.inProductionOrders);
     } catch (error) {
-      console.error('Error starting production:', error);
-      showToast('Error starting production', 'error');
+      console.error('Error completing production for client:', error);
+      showToast('Error marking client orders ready', 'error');
     } finally {
-      setStartingProduction({ all: false });
+      setClientLoading(prev => ({ ...prev, [clientId]: { ...prev[clientId], ready: false } }));
     }
   };
 
-  // Get available dates with pending orders
-  const availableDates = useMemo(() => {
-    const dates = new Set<string>();
-    deliveries
-      .filter(d => d.status === 'Pending')
-      .forEach(d => dates.add(d.date));
-    
-    return Array.from(dates).sort();
-  }, [deliveries]);
-
-  const getDateLabel = (date: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-    if (date === today) return `Today (${date})`;
-    if (date === tomorrowStr) return `Tomorrow (${date})`;
-    
-    const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'short' });
-    return `${dayOfWeek} ${date}`;
+  const handleStartAll = async () => {
+    if (queueOrdersAll.length === 0) {
+      showToast('No orders waiting in the queue', 'error');
+      return;
+    }
+    setGlobalLoading(prev => ({ ...prev, startAll: true }));
+    try {
+      await onStartAll(queueOrdersAll);
+    } catch (error) {
+      console.error('Error starting all orders:', error);
+      showToast('Error starting all orders', 'error');
+    } finally {
+      setGlobalLoading(prev => ({ ...prev, startAll: false }));
+    }
   };
 
-  if (availableDates.length === 0) {
+  const handleReadyAll = async () => {
+    if (inProductionOrdersAll.length === 0) {
+      showToast('No orders currently cooking', 'error');
+      return;
+    }
+    setGlobalLoading(prev => ({ ...prev, readyAll: true }));
+    try {
+      await onMarkAllReady(inProductionOrdersAll);
+    } catch (error) {
+      console.error('Error marking all orders ready:', error);
+      showToast('Error marking all orders ready', 'error');
+    } finally {
+      setGlobalLoading(prev => ({ ...prev, readyAll: false }));
+    }
+  };
+
+  if (clientBuckets.length === 0 || matrixRows.length === 0) {
     return (
-      <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 p-8">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🍰</div>
-          <h3 className="text-xl font-bold text-white mb-2">No Pending Orders</h3>
-          <p className="text-white/70">There are no pending deliveries to prepare.</p>
-        </div>
+      <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 p-10 text-center">
+        <div className="text-5xl mb-3">🧁</div>
+        <h3 className="text-2xl font-bold text-white mb-2">No production work yet</h3>
+        <p className="text-white/80">Orders will appear here as soon as they enter the production workflow.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header with Date Selector */}
-      <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 p-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-              🍳 Production Matrix
-            </h2>
-            <p className="text-white/80 text-sm mt-1">
-              What to cook for each client
-            </p>
-          </div>
-
-          {/* Date Selector */}
-          <div className="flex gap-2 items-center">
-            <label className="text-white font-semibold text-sm">Date:</label>
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-4 py-2 rounded-lg bg-white/90 dark:bg-slate-800/90 border-2 border-white/30 font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 outline-none"
-            >
-              {availableDates.map(date => (
-                <option key={date} value={date}>
-                  {getDateLabel(date)}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white/10 dark:bg-black/30 rounded-2xl px-4 py-3 border border-white/20 backdrop-blur">
+        <div className="flex flex-wrap gap-3 text-sm font-semibold text-white/80">
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-slate-200"></span>{STAGE_LABELS.queue}</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-amber-400"></span>{STAGE_LABELS.cooking}</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-400"></span>{STAGE_LABELS.ready}</span>
+        </div>
+        <div className="text-sm text-white/80 font-semibold">
+          Total Items: <span className="text-white font-bold">{grandTotals.total}</span>
         </div>
       </div>
 
-      {/* Matrix Table */}
-      {activeClients.length === 0 ? (
-        <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 p-8 text-center">
-          <div className="text-4xl mb-2">📅</div>
-          <p className="text-white font-semibold">No orders for {selectedDate}</p>
-        </div>
-      ) : (
-        <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 overflow-hidden">
-          {/* Scrollable Container for Mobile */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-cyan-600/50 to-purple-600/50 backdrop-blur-sm border-b-2 border-white/30">
-                  <th className="px-4 py-4 text-left font-bold text-white sticky left-0 bg-gradient-to-r from-cyan-600/70 to-purple-600/70 backdrop-blur-md z-10 min-w-[180px]">
-                    Products
-                  </th>
-                  {activeClients.map(client => (
-                    <th
-                      key={client.id}
-                      className="px-4 py-4 text-center font-bold text-white min-w-[140px] border-l border-white/20"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-sm">👤</span>
-                        <span className="text-xs leading-tight">{client.name}</span>
-                      </div>
-                    </th>
-                  ))}
-                  <th className="px-4 py-4 text-center font-bold text-white min-w-[120px] border-l-2 border-white/40 bg-pink-600/50">
-                    <div className="flex flex-col items-center">
-                      <span className="text-sm">📊</span>
-                      <span className="text-xs">TOTAL</span>
+      <div className="backdrop-blur-xl bg-white/20 dark:bg-black/30 rounded-2xl shadow-xl border border-white/30 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gradient-to-r from-cyan-600/50 to-purple-600/50 text-white">
+                <th className="sticky left-0 bg-gradient-to-r from-cyan-600/70 to-purple-600/70 px-4 py-4 text-left font-bold min-w-[200px]">Products</th>
+                {clientBuckets.map(client => (
+                  <th key={client.clientId} className="px-4 py-4 text-center font-bold min-w-[160px] border-l border-white/20">
+                    <div className="flex flex-col gap-1 items-center">
+                      <span className="text-sm">👤</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide">{client.clientName}</span>
+                      <span className="text-xs text-white/80">Total: {clientTotals[client.clientId]?.total ?? 0}</span>
                     </div>
                   </th>
+                ))}
+                <th className="px-4 py-4 text-center font-bold min-w-[160px] border-l-2 border-white/40 bg-pink-600/60">Totals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrixRows.map((row, index) => (
+                <tr
+                  key={row.productId}
+                  className={`border-b border-white/10 ${index % 2 === 0 ? 'bg-white/5 dark:bg-white/10' : ''}`}
+                >
+                  <td className="sticky left-0 bg-slate-900/60 text-white px-4 py-3 font-semibold uppercase tracking-wide text-sm">
+                    {row.productName}
+                  </td>
+                  {clientBuckets.map(client => {
+                    const counts = row.clientStages[client.clientId] || EMPTY_COUNTS;
+                    const total = sumStageCounts(counts);
+                    return (
+                      <td key={client.clientId} className="px-4 py-3 text-center align-top border-l border-white/10">
+                        {total === 0 ? (
+                          <span className="text-white/30 text-sm">—</span>
+                        ) : (
+                          <div className="space-y-1">
+                            {counts.queue > 0 && (
+                              <span className="block text-xs font-semibold bg-slate-200 text-slate-900 rounded-full px-2 py-1">
+                                ⏳ {counts.queue}
+                              </span>
+                            )}
+                            {counts.cooking > 0 && (
+                              <span className="block text-xs font-semibold bg-amber-400 text-amber-900 rounded-full px-2 py-1">
+                                🔥 {counts.cooking}
+                              </span>
+                            )}
+                            {counts.ready > 0 && (
+                              <span className="block text-xs font-semibold bg-emerald-400 text-emerald-900 rounded-full px-2 py-1">
+                                ✅ {counts.ready}
+                              </span>
+                            )}
+                            <div className="text-xs text-white/70 font-semibold">Total: {total}</div>
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-4 py-3 text-center border-l-2 border-white/20 bg-pink-500/20">
+                    <div className="space-y-1">
+                      {row.totals.queue > 0 && (
+                        <span className="block text-xs font-semibold bg-white/80 text-slate-900 rounded-full px-2 py-1">
+                          ⏳ {row.totals.queue}
+                        </span>
+                      )}
+                      {row.totals.cooking > 0 && (
+                        <span className="block text-xs font-semibold bg-amber-400 text-amber-900 rounded-full px-2 py-1">
+                          🔥 {row.totals.cooking}
+                        </span>
+                      )}
+                      {row.totals.ready > 0 && (
+                        <span className="block text-xs font-semibold bg-emerald-400 text-emerald-900 rounded-full px-2 py-1">
+                          ✅ {row.totals.ready}
+                        </span>
+                      )}
+                      <div className="text-xs text-white font-bold">Total: {row.totals.total}</div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {matrixData.map((row, rowIndex) => (
-                  <tr
-                    key={row.productId}
-                    className={`border-b border-white/10 hover:bg-white/10 transition-colors ${
-                      rowIndex % 2 === 0 ? 'bg-white/5' : ''
-                    }`}
-                  >
-                    {/* Product Name - Sticky */}
-                    <td className="px-4 py-3 font-semibold text-white sticky left-0 bg-slate-800/80 backdrop-blur-md z-10 border-r border-white/10">
-                      {row.productName}
-                    </td>
+              ))}
 
-                    {/* Client Quantities */}
-                    {activeClients.map(client => {
-                      const quantity = row.clientQuantities[client.id] || 0;
-                      return (
-                        <td
-                          key={client.id}
-                          className="px-4 py-3 text-center border-l border-white/10"
+              <tr className="bg-slate-900/70 text-white border-t border-white/20">
+                <td className="sticky left-0 px-4 py-4 font-bold uppercase text-sm tracking-wide">Actions</td>
+                {clientBuckets.map(client => {
+                  const loadingState = clientLoading[client.clientId] || {};
+                  const queueCount = clientTotals[client.clientId]?.queue ?? 0;
+                  const cookingCount = clientTotals[client.clientId]?.cooking ?? 0;
+                  return (
+                    <td key={client.clientId} className="px-2 py-4 text-center border-l border-white/10">
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleClientStart(client.clientId)}
+                          disabled={loadingState.start || queueCount === 0}
+                          className="px-3 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-xs shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {quantity > 0 ? (
-                            <span className="inline-block px-3 py-1 rounded-full bg-cyan-500/30 text-white font-bold text-lg border border-cyan-400/50">
-                              {quantity}
+                          {loadingState.start ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                              Starting...
                             </span>
                           ) : (
-                            <span className="text-white/30 text-sm">—</span>
+                            <span className="flex flex-col items-center gap-1">
+                              <span>🍳 Start</span>
+                              <span className="text-[10px] text-white/80">{queueCount} items</span>
+                            </span>
                           )}
-                        </td>
-                      );
-                    })}
-
-                    {/* Total Column */}
-                    <td className="px-4 py-3 text-center border-l-2 border-white/20 bg-pink-500/20">
-                      <span className="inline-block px-3 py-1 rounded-full bg-pink-600/50 text-white font-black text-lg border-2 border-pink-400">
-                        {row.totalQuantity}
-                      </span>
+                        </button>
+                        <button
+                          onClick={() => handleClientReady(client.clientId)}
+                          disabled={loadingState.ready || cookingCount === 0}
+                          className="px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-xs shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingState.ready ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                              Updating...
+                            </span>
+                          ) : (
+                            <span className="flex flex-col items-center gap-1">
+                              <span>✅ Ready</span>
+                              <span className="text-[10px] text-white/80">{cookingCount} items</span>
+                            </span>
+                          )}
+                        </button>
+                      </div>
                     </td>
-                  </tr>
-                ))}
-
-                {/* Action Row - Start Cooking Buttons */}
-                <tr className="bg-gradient-to-r from-green-600/30 to-green-500/30 backdrop-blur-sm border-t-2 border-white/30">
-                  <td className="px-4 py-4 font-bold text-white sticky left-0 bg-green-700/50 backdrop-blur-md z-10">
-                    Actions
-                  </td>
-                  {activeClients.map(client => (
-                    <td key={client.id} className="px-2 py-4 text-center border-l border-white/10">
-                      <button
-                        onClick={() => handleStartCooking(client.id)}
-                        disabled={startingProduction[client.id]}
-                        className="w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all disabled:cursor-not-allowed text-sm"
-                      >
-                        {startingProduction[client.id] ? (
-                          <span className="flex items-center justify-center gap-1">
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                            <span className="hidden sm:inline">...</span>
-                          </span>
-                        ) : (
-                          <span className="flex flex-col items-center gap-1">
-                            <span>🍳</span>
-                            <span className="text-xs leading-tight">Start<br/>Cooking</span>
-                          </span>
-                        )}
-                      </button>
-                    </td>
-                  ))}
-                  <td className="px-2 py-4 text-center border-l-2 border-white/20 bg-green-600/30">
+                  );
+                })}
+                <td className="px-2 py-4 text-center border-l-2 border-white/30 bg-slate-800/80">
+                  <div className="flex flex-col gap-2">
                     <button
-                      onClick={handleStartAllCooking}
-                      disabled={startingProduction.all}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-black rounded-lg shadow-lg hover:shadow-xl transition-all disabled:cursor-not-allowed"
+                      onClick={handleStartAll}
+                      disabled={globalLoading.startAll || queueOrdersAll.length === 0}
+                      className="px-4 py-3 rounded-lg bg-gradient-to-r from-green-500 to-cyan-500 text-white font-black text-xs shadow-xl hover:shadow-2xl transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {startingProduction.all ? (
+                      {globalLoading.startAll ? (
                         <span className="flex items-center justify-center gap-2">
-                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                          Starting...
+                          <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                          Starting All...
                         </span>
                       ) : (
                         <span className="flex flex-col items-center gap-1">
-                          <span className="text-xl">🔥</span>
-                          <span className="text-xs">START ALL</span>
+                          <span>🔥 START ALL</span>
+                          <span className="text-[10px] text-white/80">{grandTotals.queue} items</span>
                         </span>
                       )}
                     </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                    <button
+                      onClick={handleReadyAll}
+                      disabled={globalLoading.readyAll || inProductionOrdersAll.length === 0}
+                      className="px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black text-xs shadow-xl hover:shadow-2xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {globalLoading.readyAll ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                          Marking...
+                        </span>
+                      ) : (
+                        <span className="flex flex-col items-center gap-1">
+                          <span>🚚 READY ALL</span>
+                          <span className="text-[10px] text-white/80">{grandTotals.cooking} items</span>
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-          {/* Summary Footer */}
-          <div className="bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-sm px-6 py-4 border-t border-white/20">
-            <div className="flex flex-wrap gap-4 justify-between items-center text-white text-sm">
-              <div>
-                <span className="font-semibold">Total Products:</span>{' '}
-                <span className="font-bold text-cyan-300">{matrixData.length}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Total Clients:</span>{' '}
-                <span className="font-bold text-purple-300">{activeClients.length}</span>
-              </div>
-              <div>
-                <span className="font-semibold">Total Items:</span>{' '}
-                <span className="font-bold text-pink-300">
-                  {matrixData.reduce((sum, row) => sum + row.totalQuantity, 0)}
-                </span>
-              </div>
-            </div>
+        <div className="bg-slate-900/80 text-white px-6 py-4 border-t border-white/20 text-sm flex flex-wrap gap-6 justify-between">
+          <div>
+            <span className="font-semibold">Total Products:</span> {matrixRows.length}
+          </div>
+          <div>
+            <span className="font-semibold">Clients in workflow:</span> {clientBuckets.length}
+          </div>
+          <div className="flex gap-3">
+            <span className="font-semibold">Queue:</span> {grandTotals.queue}
+            <span className="font-semibold">Cooking:</span> {grandTotals.cooking}
+            <span className="font-semibold">Ready:</span> {grandTotals.ready}
+            <span className="font-semibold">Overall:</span> {grandTotals.total}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
