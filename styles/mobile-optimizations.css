@@ -1,0 +1,204 @@
+/* Mobile Optimization CSS for Slatko App */
+
+/* CRITICAL: Hide hamburger menu on mobile */
+@media (max-width: 767px) {
+  /* Hide the entire sidebar */
+  aside,
+  [class*="sidebar"],
+  .glass-sidebar {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Remove margin/padding that sidebar creates */
+  main, .main-content, [role="main"] {
+    margin-left: 0 !important;
+  }
+}
+
+/* Hide sidebar on mobile (screens < 768px) */
+@media (max-width: 767px) {
+  /* Make main content full width */
+  main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-bottom: 80px !important;
+    overflow-x: hidden;
+  }
+
+  /* Make root container mobile-friendly */
+  .min-h-screen.flex {
+    flex-direction: column !important;
+    width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Remove horizontal scroll on mobile */
+  html, body {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  /* Make all content responsive */
+  * {
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+}
+
+/* Bottom Navigation Bar for Mobile */
+@media (max-width: 767px) {
+  /* Create fixed bottom navigation */
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: white;
+    border-top: 2px solid #e2e8f0;
+    z-index: 40;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  }
+
+  .mobile-bottom-nav.dark {
+    background: #1e293b;
+    border-top-color: #475569;
+  }
+
+  /* Navigation buttons */
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #64748b;
+    border: none;
+    background: none;
+  }
+
+  .mobile-nav-btn:hover {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .mobile-bottom-nav.dark .mobile-nav-btn:hover {
+    background: #334155;
+    color: #cbd5e1;
+  }
+
+  .mobile-nav-btn.active {
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  .mobile-bottom-nav.dark .mobile-nav-btn.active {
+    color: #60a5fa;
+  }
+
+  .mobile-nav-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .mobile-nav-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+  }
+}
+
+/* Touch-friendly adjustments */
+@media (max-width: 767px) {
+  /* Larger touch targets */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better spacing for fingers */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    padding: 12px !important;
+  }
+
+  /* Remove top bar menu toggle on mobile */
+  [class*="menu-toggle"],
+  [class*="hamburger"] {
+    display: none !important;
+  }
+
+  /* Responsive header */
+  header {
+    padding: 12px 16px !important;
+  }
+
+  /* Better modal sizing on mobile */
+  [role="dialog"],
+  .modal {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+  }
+}
+
+/* Fix for app layout on mobile */
+@media (max-width: 767px) {
+  .app-container {
+    display: flex;
+    flex-direction: column !important;
+  }
+
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .app-main {
+    flex: 1;
+    width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* Ensure mobile view doesn't scroll horizontally */
+@media (max-width: 767px) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body * {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* PWA touch optimizations */
+@media (max-width: 767px) {
+  /* Safe area for notches */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+      padding-bottom: max(70px, env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Disable zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import './styles/mobile-optimizations.css';
 import { DashboardView } from './components/views/DashboardView';
 import { AllOrderRecordsView } from './components/views/AllOrderRecordsView';
 import { ProductsView } from './components/views/ProductsView';
