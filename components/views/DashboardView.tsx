@@ -5,7 +5,6 @@ import { formatCurrency } from '../../utils';
 import { Product, Client, Delivery } from '../../types';
 import { useProducts, useClients, useDeliveries, useProductionBatches } from '../../hooks/useDataQueries';
 import { DailyOrderPlanning } from '../ui/DailyOrderPlanning';
-import { ProductionMatrix } from '../ui/ProductionMatrix';
 import { PageHeader } from '../ui/PageHeader';
 
 interface DashboardViewProps {
@@ -23,10 +22,10 @@ const StatCard: React.FC<{ title: string; value: string | number; }> = ({ title,
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ t, showToast }) => {
   // Use React Query hooks for data fetching
-  const { data: products = [], isLoading: productsLoading, refetch: refetchProducts } = useProducts();
+  const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
-  const { data: production = [], isLoading: productionLoading, refetch: refetchProduction } = useProductionBatches();
-  const { data: deliveries = [], isLoading: deliveriesLoading, refetch: refetchDeliveries } = useDeliveries();
+  const { data: production = [], isLoading: productionLoading } = useProductionBatches();
+  const { data: deliveries = [], isLoading: deliveriesLoading } = useDeliveries();
   
   const loading = productsLoading || clientsLoading || productionLoading || deliveriesLoading;
 
@@ -216,19 +215,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t, showToast }) =>
             <p className="relative text-3xl font-black bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(0,208,232,0.5)]">{formatCurrency(metrics.totalReceivables)}</p>
           </div>
         </div>
-
-      {/* Production Matrix - NEW: Visual production planning grid */}
-      <ProductionMatrix 
-        deliveries={deliveries}
-        products={products}
-        clients={clients}
-        t={t}
-        showToast={showToast}
-        onProductionStarted={() => {
-          refetchProduction();
-          refetchDeliveries();
-        }}
-      />
 
       {/* Daily Order Planning - Primary Feature for Workers */}
       <DailyOrderPlanning 

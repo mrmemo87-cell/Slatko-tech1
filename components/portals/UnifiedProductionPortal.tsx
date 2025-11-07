@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { unifiedWorkflow, WorkflowOrder } from '../../services/unifiedWorkflow';
 import { UnifiedOrderCard } from '../ui/UnifiedOrderCard';
 import { showToast } from '../../utils/toast';
+import { ProductionMatrix } from '../ui/ProductionMatrix';
+import { useDeliveries, useProducts, useClients } from '../../hooks/useDataQueries';
+import { translations } from '../../i18n/translations';
 
 export const UnifiedProductionPortal: React.FC = () => {
   console.log('🏭🏭🏭 UnifiedProductionPortal component RENDERING');
@@ -20,44 +23,10 @@ export const UnifiedProductionPortal: React.FC = () => {
     name: user?.user_metadata?.full_name || user?.email || 'Worker'
   };
 
-  // Calculate summary for current tab
-  const getTabSummary = () => {
-    const tabOrders = activeTab === 'queue' ? orders.queue : activeTab === 'production' ? orders.inProduction : orders.readyForPickup;
-    const itemTotals: Record<string, number> = {};
-    
-    tabOrders.forEach(order => {
-      order.items?.forEach(item => {
-        itemTotals[item.productName] = (itemTotals[item.productName] || 0) + item.quantity;
-      });
-    });
-    
-    return {
-      tabOrders,
-      itemTotals,
-      totalItems: Object.values(itemTotals).reduce((sum, qty) => sum + qty, 0)
-    };
-  };
-
-  const tabSummary = useMemo(() => getTabSummary(), [orders, activeTab]);
-  
-  // Log only when tab summary changes
-  useMemo(() => {
-    if (tabSummary.tabOrders.length > 0) {
-      console.log('📊 First order item sample:', {
-        invoiceNumber: tabSummary.tabOrders[0].invoiceNumber,
-        itemCount: tabSummary.tabOrders[0].items?.length,
-        firstItem: tabSummary.tabOrders[0].items?.[0]
-      });
-    }
-    
-    console.log('📊 Tab Summary Updated:', { 
-      activeTab, 
-      tabOrdersCount: tabSummary.tabOrders.length, 
-      productsCount: Object.keys(tabSummary.itemTotals).length,
-      itemTotals: tabSummary.itemTotals,
-      shouldShowTable: tabSummary.tabOrders.length > 0
-    });
-  }, [tabSummary]);
+  const { data: deliveries = [], refetch: refetchDeliveries } = useDeliveries();
+  const { data: products = [], refetch: refetchProducts } = useProducts();
+  const { data: clients = [], refetch: refetchClients } = useClients();
+  const t = translations.en;
 
   useEffect(() => {
     loadProductionData();
@@ -236,41 +205,19 @@ export const UnifiedProductionPortal: React.FC = () => {
       {/* Orders Grid */}
       <div className="space-y-6">
         
-        {/* Enhanced Items Summary Table */}
-        {tabSummary.tabOrders.length > 0 && (
-          <div className="summary-table animate-scale-in">
-            <div className="p-6">
-              <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                📋 Total Items to Prepare
-              </h3>
-              <p className="text-white/80 text-sm">
-                {activeTab === 'queue' ? 'Queue' : activeTab === 'production' ? 'Cooking' : 'Ready'} - All orders combined
-              </p>
-            </div>
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="text-left">Product</th>
-                  <th className="text-right">Total Quantity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(tabSummary.itemTotals)
-                  .sort(([, a], [, b]) => (b as number) - (a as number))
-                  .map(([productName, quantity]) => (
-                    <tr key={productName}>
-                      <td className="font-semibold text-gray-900">{productName}</td>
-                      <td className="text-right font-bold gradient-text text-lg">{quantity} pcs</td>
-                    </tr>
-                  ))}
-                <tr className="border-t-2 border-cyan-300 bg-gradient-to-r from-cyan-100 to-purple-100">
-                  <td className="font-bold text-cyan-900 text-lg">TOTAL ITEMS</td>
-                  <td className="text-right text-2xl font-bold gradient-text">{tabSummary.totalItems} pcs</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+        <ProductionMatrix
+          deliveries={deliveries}
+          products={products}
+          clients={clients}
+          t={t}
+          showToast={showToast}
+          onProductionStarted={() => {
+            loadProductionData();
+            refetchDeliveries();
+            refetchProducts();
+            refetchClients();
+          }}
+        />
 
         {/* Orders Grid with Enhanced Cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
