@@ -31,6 +31,7 @@ import {
 } from './components/ui/Icons';
 import { AlertCenter } from './components/ui/AlertCenter';
 import { QuickOrderButton } from './components/ui/QuickOrderButton';
+import { MobileTabNav } from './components/ui/MobileTabNav';
 import { UnifiedDeliveryPortal } from './components/portals/UnifiedDeliveryPortal';
 import { UnifiedProductionPortal } from './components/portals/UnifiedProductionPortal';
 import { UnifiedAdminPortal } from './components/views/UnifiedAdminPortal';
@@ -652,6 +653,9 @@ const AppContent: React.FC = () => {
 
         {/* Quick Order Floating Button */}
         <QuickOrderButton t={t} showToast={showToast} />
+
+        {/* Mobile Tab Navigation - for phones < 768px */}
+        <MobileTabNav currentView={view} onViewChange={setView} isDarkMode={isDarkMode} />
 
         {/* Mobile overlay */}
         {isMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={() => setIsMenuOpen(false)} />}

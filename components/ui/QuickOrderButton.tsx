@@ -655,12 +655,28 @@ export const QuickOrderButton: React.FC<QuickOrderButtonProps> = ({ t, showToast
                 </button>
               )}
               {step === 'products' && cart.length > 0 && (
-                <button
-                  onClick={() => setStep('confirm')}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-bold transition-all duration-200"
-                >
-                  {t.deliveries?.reviewOrder || 'Review Order'} →
-                </button>
+                <>
+                  <button
+                    onClick={() => setStep('confirm')}
+                    className="px-6 py-3 border-2 border-blue-600 text-blue-700 rounded-lg font-bold hover:bg-blue-50 transition-all duration-200"
+                  >
+                    {t.deliveries?.reviewOrder || 'Review'} 📋
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-bold transition-all duration-200 disabled:opacity-50 shadow-lg"
+                  >
+                    {submitting ? (
+                      <span className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        {t.common?.creating || 'Creating...'}
+                      </span>
+                    ) : (
+                      `✓ ${t.deliveries?.createOrder || 'Create Order Now'}`
+                    )}
+                  </button>
+                </>
               )}
               {step === 'confirm' && (
                 <>

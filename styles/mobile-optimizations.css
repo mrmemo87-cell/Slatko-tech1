@@ -51,7 +51,7 @@
 
 /* Bottom Navigation Bar for Mobile */
 @media (max-width: 767px) {
-  /* Create fixed bottom navigation */
+  /* Create fixed bottom navigation - LIGHTER with darker text */
   .mobile-bottom-nav {
     position: fixed;
     bottom: 0;
@@ -61,7 +61,7 @@
     display: flex;
     justify-content: space-around;
     align-items: center;
-    background: white;
+    background: #ffffff;
     border-top: 2px solid #e2e8f0;
     z-index: 40;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
@@ -72,7 +72,7 @@
     border-top-color: #475569;
   }
 
-  /* Navigation buttons */
+  /* Navigation buttons - darker text */
   .mobile-nav-btn {
     flex: 1;
     display: flex;
@@ -83,24 +83,29 @@
     gap: 4px;
     cursor: pointer;
     transition: all 0.2s ease;
-    color: #64748b;
+    color: #1e293b;
     border: none;
     background: none;
+    font-weight: 600;
   }
 
   .mobile-nav-btn:hover {
-    background: #f1f5f9;
-    color: #334155;
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .mobile-bottom-nav.dark .mobile-nav-btn {
+    color: #e2e8f0;
   }
 
   .mobile-bottom-nav.dark .mobile-nav-btn:hover {
-    background: #334155;
-    color: #cbd5e1;
+    background: #64748b;
+    color: #f1f5f9;
   }
 
   .mobile-nav-btn.active {
     color: #2563eb;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .mobile-bottom-nav.dark .mobile-nav-btn.active {
@@ -114,7 +119,7 @@
 
   .mobile-nav-label {
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     text-align: center;
   }
 }
