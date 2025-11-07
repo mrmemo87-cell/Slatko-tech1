@@ -35,26 +35,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (didInit.current) return;
     didInit.current = true;
 
-    let isMounted = true;
-    
-    // Mark that we're starting session check (before getSession promise)
-    // This prevents INITIAL_SESSION event from duplicating our work
-    hadSessionCheck.current = true;
+  let isMounted = true;
 
     // Robust session check: race supabase.getSession against a timeout so we don't hang
     const sessionCheck = async () => {
       console.log('🔐 SESSION CHECK STARTED');
-      const TIMEOUT_MS = 1000; // Ultra-fast timeout - 1 second
+      const TIMEOUT_MS = 6000; // Allow slower networks before timing out
       try {
         const resultPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ _timedOut: true }), TIMEOUT_MS));
         const res: any = await Promise.race([resultPromise, timeoutPromise]);
 
         if (res && res._timedOut) {
-          console.warn(`⚠️ Session timed out after ${TIMEOUT_MS}ms - showing login`);
+          console.warn(`⚠️ Session timed out after ${TIMEOUT_MS}ms - continuing without cached session`);
           if (isMounted) {
             setLoading(false);
-            setUser(null);
           }
           return;
         }
@@ -64,14 +59,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('❌ Session error:', error);
           if (isMounted) {
             setLoading(false);
-            setUser(null);
           }
           return;
         }
 
+        // Mark session check as completed successfully so INITIAL_SESSION events can be skipped
+        hadSessionCheck.current = true;
+
         const authUser = data?.session?.user ?? null;
         console.log('✅ Got auth user:', authUser?.email || 'none');
-        if (!authUser) { if (isMounted) setUser(null); return; }
+  if (!authUser) { if (isMounted) setUser(null); return; }
 
         // Fetch profile directly from users table
         console.log('🔐 Fetching profile for auth_user_id:', authUser.id);
