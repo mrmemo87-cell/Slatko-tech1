@@ -97,7 +97,7 @@ const AppContent: React.FC = () => {
     return result;
   }, [user?.role, user?.user_metadata, user?.app_metadata]);
 
-  // Safety timeout for loading state - if stuck for 10 seconds, force proceed
+  // Safety timeout for loading state - if stuck for 5 seconds, force proceed
   useEffect(() => {
     if (!loading) {
       setAuthLoadingTimeout(false);
@@ -105,9 +105,9 @@ const AppContent: React.FC = () => {
     }
 
     const timeout = setTimeout(() => {
-      console.warn('⏱️ Auth loading timeout - forcing UI to render');
+      console.warn('⏱️ Auth loading timeout (5s) - forcing UI to render');
       setAuthLoadingTimeout(true);
-    }, 10000);
+    }, 5000); // Reduced from 10000 to 5000
 
     return () => clearTimeout(timeout);
   }, [loading]);
