@@ -309,7 +309,7 @@ const AppContent: React.FC = () => {
     // Non-workers get full access
     switch (view) {
       case 'dashboard':
-        return <DashboardView t={t} />;
+        return <DashboardView t={t} showToast={showToast} />;
       case 'materials':
         return <MaterialsView {...props} />;
       case 'purchases':
