@@ -10,7 +10,9 @@ const countOrderItems = (orders: WorkflowOrder[]) =>
     return orderTotal + itemsTotal;
   }, 0);
 
-export const UnifiedProductionPortal: React.FC = () => {
+interface UnifiedProductionPortalProps { t?: any; lang?: 'en' | 'ru' | 'ar'; }
+
+export const UnifiedProductionPortal: React.FC<UnifiedProductionPortalProps> = ({ t, lang = 'en' }) => {
   console.log('🏭🏭🏭 UnifiedProductionPortal component RENDERING');
 
   const { user } = useAuth();
@@ -161,21 +163,21 @@ export const UnifiedProductionPortal: React.FC = () => {
 
   const summaryCards = [
     {
-      label: 'In Queue',
+      label: t?.productionPortal?.queueLabel ?? 'Queue',
       icon: '⏳',
       orders: orderCounts.queue,
       items: itemCounts.queue,
       accent: 'from-sky-500/40 to-cyan-500/40'
     },
     {
-      label: 'Cooking',
+      label: t?.productionPortal?.cookingLabel ?? 'Cooking',
       icon: '🔥',
       orders: orderCounts.inProduction,
       items: itemCounts.inProduction,
       accent: 'from-amber-500/40 to-orange-500/40'
     },
     {
-      label: 'Ready',
+      label: t?.productionPortal?.readyLabel ?? 'Ready',
       icon: '✅',
       orders: orderCounts.ready,
       items: itemCounts.ready,
@@ -184,35 +186,38 @@ export const UnifiedProductionPortal: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen animate-fade-in">
-      <div className="glass-header sticky top-0 z-40 py-6 px-6 shadow-lg">
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <div className="glass-header sticky top-0 z-40 py-6 px-6 shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold gradient-text flex items-center gap-3">
-                🏭 Production Portal
-              </h1>
-              <p className="text-gray-600 mt-1 font-medium">
-                Kitchen workflow management • every order, every stage
+              <div className="flex items-center gap-3">
+                <img src="/logo/logo.png" alt="Slatko Logo" className="h-10 w-10 object-contain" />
+                <h1 className="text-3xl font-bold gradient-text flex items-center gap-3">
+                  🏭 {t?.productionPortal?.title ?? 'Production Portal'}
+                </h1>
+              </div>
+              <p className="text-gray-600 dark:text-slate-300 mt-1 font-medium">
+                {t?.productionPortal?.subtitle ?? 'Kitchen workflow management • every order, every stage'}
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <div className="badge badge-worker animate-float">
-                👨‍🍳 {currentUser.name}
+              <div className="badge badge-worker animate-float bg-white/80 dark:bg-slate-800/80 text-slate-800 dark:text-slate-100">
+                👨‍🍳 {t?.productionPortal?.loggedInAs ?? 'Logged in as'}: {currentUser.name}
               </div>
               <button
                 onClick={() => loadProductionData(true)}
                 disabled={refreshing}
-                className="btn-primary flex items-center gap-2 disabled:opacity-60"
+                className="btn-primary flex items-center gap-2 disabled:opacity-60 bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-600 hover:to-fuchsia-600"
               >
                 {refreshing ? (
                   <>
                     <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
-                    Refreshing
+                    {t?.productionPortal?.refreshing ?? 'Refreshing'}
                   </>
                 ) : (
                   <>
-                    🔄 Refresh
+                    🔄 {t?.productionPortal?.refresh ?? 'Refresh'}
                   </>
                 )}
               </button>
@@ -221,39 +226,45 @@ export const UnifiedProductionPortal: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        <div className="grid gap-4 md:grid-cols-3">
-          {summaryCards.map(card => (
-            <div
-              key={card.label}
-              className={`glass-card p-6 border border-white/40 bg-gradient-to-br ${card.accent}`}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-3xl">{card.icon}</span>
-                <span className="text-xs uppercase tracking-wide text-white/70 font-semibold">
-                  {card.label}
-                </span>
-              </div>
-              <div className="text-white">
-                <div className="text-4xl font-black leading-none drop-shadow-sm">{card.items}</div>
-                <div className="text-sm font-semibold text-white/80 mt-2">
-                  Items across {card.orders} orders
+      <div className="flex-1 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 h-full">
+          <div className="grid gap-4 md:grid-cols-3 shrink-0">
+            {summaryCards.map(card => (
+              <div
+                key={card.label}
+                className={`glass-card p-6 border border-white/40 bg-gradient-to-br ${card.accent} dark:border-slate-700`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-3xl">{card.icon}</span>
+                  <span className="text-xs uppercase tracking-wide text-white/70 font-semibold">
+                    {card.label}
+                  </span>
+                </div>
+                <div className="text-white">
+                  <div className="text-4xl font-black leading-none drop-shadow-sm">{card.items}</div>
+                  <div className="text-sm font-semibold text-white/80 mt-2">
+                    {(t?.productionPortal?.ordersLabel ?? 'Orders') + ': '}{card.orders}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <ProductionMatrix
-          queue={orders.queue}
-          inProduction={orders.inProduction}
-          readyForPickup={orders.readyForPickup}
-          showToast={showToast}
-          onStartClient={handleStartClient}
-          onMarkReadyClient={handleReadyClient}
-          onStartAll={handleStartAll}
-          onMarkAllReady={handleReadyAll}
-        />
+          <div className="flex-1 min-h-0">
+            <ProductionMatrix
+              queue={orders.queue}
+              inProduction={orders.inProduction}
+              readyForPickup={orders.readyForPickup}
+              t={t}
+              locale={lang}
+              showToast={showToast}
+              onStartClient={handleStartClient}
+              onMarkReadyClient={handleReadyClient}
+              onStartAll={handleStartAll}
+              onMarkAllReady={handleReadyAll}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

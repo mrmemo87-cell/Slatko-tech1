@@ -303,7 +303,7 @@ const AppContent: React.FC = () => {
         setView('production-portal');
       }
       // ALWAYS return production portal for workers, never anything else
-      return <UnifiedProductionPortal />;
+  return <UnifiedProductionPortal t={t} lang={lang} />;
     }
     
     // Non-workers get full access
@@ -327,7 +327,7 @@ const AppContent: React.FC = () => {
       case 'import':
         return <BulkImport {...props} />;
       case 'production-portal':
-        return <UnifiedProductionPortal />;
+  return <UnifiedProductionPortal t={t} lang={lang} />;
       case 'delivery-portal':
         return <UnifiedDeliveryPortal />;
       case 'admin-portal':
@@ -651,8 +651,10 @@ const AppContent: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Order Floating Button */}
-        <QuickOrderButton t={t} showToast={showToast} />
+        {/* Quick Order Floating Button - hidden on Production Portal and for worker accounts */}
+        {!isWorker && view !== 'production-portal' && (
+          <QuickOrderButton t={t} showToast={showToast} />
+        )}
 
         {/* Mobile overlay */}
         {isMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" onClick={() => setIsMenuOpen(false)} />}
